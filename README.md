@@ -2,25 +2,7 @@
 
 A terminal UI for managing systemd services. Browse services, watch live logs, and control service lifecycle — all from one screen.
 
-```
-┌──────────────────────────────────────────────────────┐
-│ [Filter: Both] [Mode: All] [Sort: Name]              │
-├───────────────┬──────────────────────────────────────┤
-│               │ Service: nginx.service               │
-│  ✗ failed-svc │ Status: active (running)   PID: 3821│
-│  ● nginx      │ Memory: 45.2 MB   Up: 3d 12h 04m   │
-│  ● sshd       │ File: /etc/systemd/system/nginx.srv │
-│  ○ bluetooth  │ Enabled: yes                         │
-│  ○ cups       │ Deps: network-online.target, ...     │
-│               │──────────────────────────────────────│
-│               │ Logs: nginx.service [info]    [LIVE] │
-│               │ Mar 20 12:00:01 nginx[3821]: ...     │
-│               │ Mar 20 12:00:02 nginx[3821]: ...     │
-│               │                                      │
-├───────────────┴──────────────────────────────────────┤
-│ [s]start [r]restart [x]stop ... [p]split [w]close [?]│
-└──────────────────────────────────────────────────────┘
-```
+<img src="https://private-user-images.githubusercontent.com/82485126/567120369-6c40710c-c9f1-4ba8-b5e9-640a3a39034c.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzQwNDkwNTAsIm5iZiI6MTc3NDA0ODc1MCwicGF0aCI6Ii84MjQ4NTEyNi81NjcxMjAzNjktNmM0MDcxMGMtYzlmMS00YmE4LWI1ZTktNjQwYTNhMzkwMzRjLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAzMjAlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMzIwVDIzMTkxMFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWRkMjg0MGEzODQ0OWRjYTFiYzk5NjU0YjE4M2E4YzM3OTRiNDdhMGE1Y2UyOTkwYjFmODRiMTM3ZGUzMTFjNDYmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.zJZ3Qs3ejOkhe676c7mwl2BxZlXSRnLHUHh8_wcakUw" width="50%">
 
 ## Install
 
@@ -73,10 +55,9 @@ Each action shows a confirmation prompt. Press `y` to confirm or any other key t
 |-----|--------|
 | `/` | Fuzzy search services by name |
 | `Ctrl-/` | Search within log output |
-| `f` | Cycle scope: User / System / Both |
-| `a` | Cycle status filter: All / Active / Inactive / Failed |
+| `f` | Cycle scope filter: User / System / Both |
 | `i` | Toggle include/all mode |
-| `t` | Cycle sort: Name / Status / Uptime |
+| `t` | Cycle sort: Name / Status / Enabled |
 | `l` | Cycle log priority: err / warning / notice / info / debug |
 
 ### Pane Management
@@ -94,7 +75,6 @@ Split the log area into multiple panes, each pinned to a different service — u
 | Key | Action |
 |-----|--------|
 | `q` | Quit |
-| `Ctrl-c` | Quit (works from any mode) |
 | `?` | Show full keybinding help |
 | `Esc` | Cancel / close overlay |
 
@@ -116,12 +96,11 @@ Optional. Place a file at `~/.config/sysdui/config.toml`:
 [filter]
 mode = "all"         # "all" (show everything except excludes) or "include" (only show includes)
 show = "both"        # "user", "system", or "both"
-status = "all"       # "all", "active", "inactive", or "failed"
 include = ["nginx.service", "sshd.service"]
 exclude = ["systemd-tmpfiles-clean.service"]
 
 [sort]
-default = "name"     # "name", "status", or "uptime"
+default = "name"     # "name", "status", or "enabled"
 
 [log]
 priority = "info"    # "err", "warning", "notice", "info", "debug"
