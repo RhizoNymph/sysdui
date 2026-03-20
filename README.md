@@ -70,6 +70,20 @@ Split the log area into multiple panes, each pinned to a different service — u
 | `w` | Close focused pane |
 | `Tab` | Cycle focus between panes |
 
+### Mouse
+
+| Action | Effect |
+|--------|--------|
+| Click service | Select it in sidebar |
+| Double-click service | Select + load logs into focused pane |
+| Right-click service | Context menu: Start / Stop / Restart / Enable / Disable / Split into pane |
+| Click log pane | Focus that pane |
+| Right-click log pane | Context menu: Split Horizontal / Vertical / Close |
+| Middle-click log pane | Close pane |
+| Scroll wheel over sidebar | Move selection up/down |
+| Scroll wheel over log pane | Scroll that pane's logs (even if unfocused) |
+| Click status bar | Cycle the clicked filter/sort (Scope / Status / Mode / Sort) |
+
 ### General
 
 | Key | Action |

@@ -11,6 +11,7 @@ pub fn render_sidebar(
     units: &[UnitInfo],
     selected_index: usize,
     focused: bool,
+    state: &mut ListState,
 ) {
     let border_style = if focused {
         Style::default().fg(Color::Cyan)
@@ -51,10 +52,11 @@ pub fn render_sidebar(
         )
         .highlight_symbol("▶ ");
 
-    let mut state = ListState::default();
     if !units.is_empty() {
         state.select(Some(selected_index));
+    } else {
+        state.select(None);
     }
 
-    frame.render_stateful_widget(list, area, &mut state);
+    frame.render_stateful_widget(list, area, state);
 }
