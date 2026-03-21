@@ -2,7 +2,7 @@
 
 A terminal UI for managing systemd services. Browse services, watch live logs, and control service lifecycle — all from one screen.
 
-<img src="https://private-user-images.githubusercontent.com/82485126/567120369-6c40710c-c9f1-4ba8-b5e9-640a3a39034c.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzQwNDkwNTAsIm5iZiI6MTc3NDA0ODc1MCwicGF0aCI6Ii84MjQ4NTEyNi81NjcxMjAzNjktNmM0MDcxMGMtYzlmMS00YmE4LWI1ZTktNjQwYTNhMzkwMzRjLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAzMjAlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMzIwVDIzMTkxMFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWRkMjg0MGEzODQ0OWRjYTFiYzk5NjU0YjE4M2E4YzM3OTRiNDdhMGE1Y2UyOTkwYjFmODRiMTM3ZGUzMTFjNDYmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.zJZ3Qs3ejOkhe676c7mwl2BxZlXSRnLHUHh8_wcakUw" width="50%">
+<img src="https://private-user-images.githubusercontent.com/82485126/567146541-fb859245-7ff4-4ebd-97a9-1f1a802d787f.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzQwNTI2MTcsIm5iZiI6MTc3NDA1MjMxNywicGF0aCI6Ii84MjQ4NTEyNi81NjcxNDY1NDEtZmI4NTkyNDUtN2ZmNC00ZWJkLTk3YTktMWYxYTgwMmQ3ODdmLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAzMjElMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMzIxVDAwMTgzN1omWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWExYjg2MGNjNmU0Yzk3NjkwNjM2NWQyYmE1YzBlMjY5ZjYyYzUwNDMzZTNkY2RmMGJiMTI2MDYyMDgzYTZkNzYmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.XOeVB54sJ4qzXrf2ARis_SopA5b6rnNLo-vFh6QA5MY">
 
 ## Install
 
@@ -69,6 +69,20 @@ Split the log area into multiple panes, each pinned to a different service — u
 | `p` | Split focused pane (then `h` for horizontal, `v` for vertical) |
 | `w` | Close focused pane |
 | `Tab` | Cycle focus between panes |
+
+### Mouse
+
+| Action | Effect |
+|--------|--------|
+| Click service | Select it in sidebar |
+| Double-click service | Select + load logs into focused pane |
+| Right-click service | Context menu: Start / Stop / Restart / Enable / Disable / Split into pane |
+| Click log pane | Focus that pane |
+| Right-click log pane | Context menu: Split Horizontal / Vertical / Close |
+| Middle-click log pane | Close pane |
+| Scroll wheel over sidebar | Move selection up/down |
+| Scroll wheel over log pane | Scroll that pane's logs (even if unfocused) |
+| Click status bar | Cycle the clicked filter/sort (Scope / Status / Mode / Sort) |
 
 ### General
 

@@ -1,4 +1,5 @@
 pub mod confirm;
+pub mod context_menu;
 pub mod detail;
 pub mod help;
 pub mod logs;
@@ -7,11 +8,35 @@ pub mod search;
 pub mod sidebar;
 
 use ratatui::prelude::*;
+use ratatui::widgets::ListState;
 
 use crate::app::App;
 use crate::app::InputMode;
+use crate::ui::panes::PaneId;
 
-pub fn render(app: &App, frame: &mut Frame) {
+pub struct LayoutCache {
+    pub sidebar_area: Rect,
+    pub detail_area: Rect,
+    pub pane_rects: Vec<(PaneId, Rect)>,
+    pub status_line_area: Rect,
+    pub sidebar_scroll_offset: usize,
+    pub frame_size: Rect,
+}
+
+impl Default for LayoutCache {
+    fn default() -> Self {
+        Self {
+            sidebar_area: Rect::default(),
+            detail_area: Rect::default(),
+            pane_rects: Vec::new(),
+            status_line_area: Rect::default(),
+            sidebar_scroll_offset: 0,
+            frame_size: Rect::default(),
+        }
+    }
+}
+
+pub fn render(app: &App, sidebar_state: &mut ListState, frame: &mut Frame) -> LayoutCache {
     let size = frame.area();
 
     // Main layout: sidebar | main panel, with help bar at bottom
@@ -74,6 +99,7 @@ pub fn render(app: &App, frame: &mut Frame) {
         sidebar_focused,
         &app.config.filter.include,
         app.list_mode,
+        sidebar_state,
     );
 
     // Split main panel: detail (top) + logs (bottom)
@@ -109,6 +135,8 @@ pub fn render(app: &App, frame: &mut Frame) {
         .constraints([Constraint::Length(1), Constraint::Length(1)])
         .split(help_area);
 
+    let status_line_area = help_chunks[0];
+
     // Status line
     let mode_label = match app.list_mode {
         crate::app::ListMode::Include => {
@@ -132,7 +160,7 @@ pub fn render(app: &App, frame: &mut Frame) {
     ];
     frame.render_widget(
         ratatui::widgets::Paragraph::new(Line::from(status_spans)),
-        help_chunks[0],
+        status_line_area,
     );
 
     let is_search = matches!(
@@ -154,7 +182,21 @@ pub fn render(app: &App, frame: &mut Frame) {
         InputMode::SplitPrompt => {
             render_split_prompt(frame, size);
         }
+        InputMode::ContextMenu => {
+            if let Some(menu) = &app.context_menu {
+                context_menu::render_context_menu(frame, menu, size);
+            }
+        }
         _ => {}
+    }
+
+    LayoutCache {
+        sidebar_area,
+        detail_area,
+        pane_rects: pane_layouts,
+        status_line_area,
+        sidebar_scroll_offset: sidebar_state.offset(),
+        frame_size: size,
     }
 }
 

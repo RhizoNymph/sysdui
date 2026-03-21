@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Instant;
 
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
@@ -6,6 +7,7 @@ use nucleo_matcher::{
     Matcher,
     pattern::{Atom, AtomKind, CaseMatching, Normalization},
 };
+use ratatui::layout::{Position, Rect};
 use tokio::sync::mpsc;
 use zbus::Connection;
 
@@ -17,7 +19,11 @@ use crate::journal::filter::Priority;
 use crate::systemd::commands::{ServiceAction, edit_unit_file, execute_systemctl};
 use crate::systemd::dbus;
 use crate::systemd::types::*;
+use crate::ui::LayoutCache;
 use crate::ui::confirm::ConfirmDialog;
+use crate::ui::context_menu::{
+    ContextMenu, ContextMenuAction, ContextMenuItem, ContextMenuTarget, compute_menu_rect,
+};
 use crate::ui::panes::{PaneId, PaneTree, SplitDirection};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,6 +34,15 @@ pub enum InputMode {
     Confirm,
     Help,
     SplitPrompt,
+    ContextMenu,
+}
+
+pub enum HitTarget {
+    Sidebar,
+    Detail,
+    Pane(PaneId),
+    StatusBar,
+    None,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,6 +162,9 @@ pub struct App {
     pub focused_pane: PaneId,
     pub input_mode: InputMode,
     pub confirm_dialog: Option<ConfirmDialog>,
+    pub context_menu: Option<ContextMenu>,
+    pub layout_cache: LayoutCache,
+    pub last_click: Option<(u16, u16, Instant)>,
     pub config: Config,
     pub system_bus: Connection,
     pub session_bus: Connection,
@@ -215,6 +233,9 @@ impl App {
             focused_pane: 1,
             input_mode: InputMode::Normal,
             confirm_dialog: None,
+            context_menu: None,
+            layout_cache: LayoutCache::default(),
+            last_click: None,
             config,
             system_bus,
             session_bus,
@@ -370,7 +391,7 @@ impl App {
     pub async fn handle_event(&mut self, event: AppEvent) {
         match event {
             AppEvent::Terminal(Event::Key(key)) => self.handle_key(key).await,
-            AppEvent::Terminal(Event::Mouse(mouse)) => self.handle_mouse(mouse),
+            AppEvent::Terminal(Event::Mouse(mouse)) => self.handle_mouse(mouse).await,
             AppEvent::Terminal(Event::Resize(_, _)) => {} // re-render handles this
             AppEvent::Tick => self.handle_tick().await,
             AppEvent::Render => {} // handled in main loop
@@ -492,6 +513,29 @@ impl App {
                         self.input_mode = InputMode::Normal;
                     }
                     _ => {
+                        self.input_mode = InputMode::Normal;
+                    }
+                }
+                return;
+            }
+            InputMode::ContextMenu => {
+                match key.code {
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        if let Some(menu) = &mut self.context_menu {
+                            menu.selected_index =
+                                (menu.selected_index + 1).min(menu.items.len().saturating_sub(1));
+                        }
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        if let Some(menu) = &mut self.context_menu {
+                            menu.selected_index = menu.selected_index.saturating_sub(1);
+                        }
+                    }
+                    KeyCode::Enter => {
+                        self.execute_context_menu_action();
+                    }
+                    _ => {
+                        self.context_menu = None;
                         self.input_mode = InputMode::Normal;
                     }
                 }
@@ -628,31 +672,342 @@ impl App {
         }
     }
 
-    fn handle_mouse(&mut self, mouse: MouseEvent) {
+    fn hit_test(&self, col: u16, row: u16) -> HitTarget {
+        let pos = Position { x: col, y: row };
+        if self.layout_cache.sidebar_area.contains(pos) {
+            return HitTarget::Sidebar;
+        }
+        if self.layout_cache.detail_area.contains(pos) {
+            return HitTarget::Detail;
+        }
+        for (pane_id, rect) in &self.layout_cache.pane_rects {
+            if rect.contains(pos) {
+                return HitTarget::Pane(*pane_id);
+            }
+        }
+        if self.layout_cache.status_line_area.contains(pos) {
+            return HitTarget::StatusBar;
+        }
+        HitTarget::None
+    }
+
+    fn sidebar_row_to_index(&self, row: u16) -> Option<usize> {
+        let sa = self.layout_cache.sidebar_area;
+        let relative_row = row.saturating_sub(sa.y + 1) as usize; // -1 for top border
+        let index = relative_row + self.layout_cache.sidebar_scroll_offset;
+        if index < self.filtered_units.len() {
+            Some(index)
+        } else {
+            None
+        }
+    }
+
+    fn context_menu_rect(&self) -> Option<Rect> {
+        let menu = self.context_menu.as_ref()?;
+        let max_label_width = menu.items.iter().map(|i| i.label.len()).max().unwrap_or(0);
+        Some(compute_menu_rect(
+            menu.x,
+            menu.y,
+            menu.items.len(),
+            max_label_width,
+            self.layout_cache.frame_size,
+        ))
+    }
+
+    async fn handle_mouse(&mut self, mouse: MouseEvent) {
+        let col = mouse.column;
+        let row = mouse.row;
+
+        if self.input_mode == InputMode::ContextMenu {
+            self.handle_mouse_context_menu(mouse);
+            return;
+        }
+
         match mouse.kind {
-            MouseEventKind::ScrollUp => {
-                if let Some(pane) = self.pane_tree.get_leaf_mut(self.focused_pane) {
-                    pane.scroll_offset = pane.scroll_offset.saturating_add(3);
+            MouseEventKind::ScrollUp => match self.hit_test(col, row) {
+                HitTarget::Sidebar => self.navigate(-3),
+                HitTarget::Pane(pane_id) => {
+                    if let Some(pane) = self.pane_tree.get_leaf_mut(pane_id) {
+                        pane.scroll_offset = pane.scroll_offset.saturating_add(3);
+                    }
                 }
-            }
-            MouseEventKind::ScrollDown => {
-                if let Some(pane) = self.pane_tree.get_leaf_mut(self.focused_pane) {
-                    pane.scroll_offset = pane.scroll_offset.saturating_sub(3);
+                _ => {}
+            },
+            MouseEventKind::ScrollDown => match self.hit_test(col, row) {
+                HitTarget::Sidebar => self.navigate(3),
+                HitTarget::Pane(pane_id) => {
+                    if let Some(pane) = self.pane_tree.get_leaf_mut(pane_id) {
+                        pane.scroll_offset = pane.scroll_offset.saturating_sub(3);
+                    }
                 }
-            }
+                _ => {}
+            },
             MouseEventKind::Down(MouseButton::Left) => {
-                // Check if click is in sidebar area (rough heuristic: x < 35)
-                if mouse.column < 35 {
-                    // Sidebar click — calculate which row
-                    let row = mouse.row.saturating_sub(1) as usize; // account for border
-                    if row < self.filtered_units.len() {
-                        self.selected_index = row;
-                        let tx = self.tx.clone();
-                        let _ = tx; // selection will trigger detail fetch on next tick
+                // Double-click detection
+                let is_double = if let Some((lx, ly, lt)) = self.last_click {
+                    lx == col && ly == row && lt.elapsed().as_millis() < 300
+                } else {
+                    false
+                };
+
+                if is_double {
+                    self.last_click = None;
+                } else {
+                    self.last_click = Some((col, row, Instant::now()));
+                }
+
+                match self.hit_test(col, row) {
+                    HitTarget::Sidebar => {
+                        if let Some(index) = self.sidebar_row_to_index(row) {
+                            self.selected_index = index;
+                            if is_double {
+                                self.select_service().await;
+                            }
+                        }
+                    }
+                    HitTarget::Pane(pane_id) => {
+                        self.focused_pane = pane_id;
+                    }
+                    HitTarget::StatusBar => {
+                        let sl = self.layout_cache.status_line_area;
+                        let zone_width = sl.width / 4;
+                        if zone_width > 0 {
+                            let relative_x = col.saturating_sub(sl.x);
+                            let zone = (relative_x / zone_width).min(3);
+                            match zone {
+                                0 => {
+                                    self.filter_mode = self.filter_mode.cycle_next();
+                                    self.load_units().await.ok();
+                                    self.apply_filters();
+                                }
+                                1 => {
+                                    self.status_filter = self.status_filter.cycle_next();
+                                    self.apply_filters();
+                                }
+                                2 => {
+                                    self.list_mode = self.list_mode.cycle_next();
+                                    self.apply_filters();
+                                }
+                                3 => {
+                                    self.sort_mode = self.sort_mode.cycle_next();
+                                    self.apply_filters();
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            MouseEventKind::Down(MouseButton::Right) => match self.hit_test(col, row) {
+                HitTarget::Sidebar => {
+                    if let Some(index) = self.sidebar_row_to_index(row) {
+                        let unit_name = self.filtered_units[index].name.clone();
+                        self.open_sidebar_context_menu(col, row, unit_name);
+                    }
+                }
+                HitTarget::Pane(pane_id) => {
+                    self.open_pane_context_menu(col, row, pane_id);
+                }
+                _ => {}
+            },
+            MouseEventKind::Down(MouseButton::Middle) => {
+                if let HitTarget::Pane(pane_id) = self.hit_test(col, row) {
+                    let next = self.pane_tree.next_leaf_id(pane_id);
+                    if self.pane_tree.close(pane_id) {
+                        self.focused_pane = next;
                     }
                 }
             }
             _ => {}
+        }
+    }
+
+    fn handle_mouse_context_menu(&mut self, mouse: MouseEvent) {
+        let col = mouse.column;
+        let row = mouse.row;
+
+        match mouse.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                let menu_rect = self.context_menu_rect();
+                if let Some(rect) = menu_rect {
+                    if rect.contains(Position { x: col, y: row }) {
+                        let item_row = row.saturating_sub(rect.y + 1) as usize;
+                        let item_count = self
+                            .context_menu
+                            .as_ref()
+                            .map(|m| m.items.len())
+                            .unwrap_or(0);
+                        if item_row < item_count {
+                            if let Some(m) = &mut self.context_menu {
+                                m.selected_index = item_row;
+                            }
+                            self.execute_context_menu_action();
+                        }
+                    } else {
+                        self.context_menu = None;
+                        self.input_mode = InputMode::Normal;
+                    }
+                } else {
+                    self.context_menu = None;
+                    self.input_mode = InputMode::Normal;
+                }
+            }
+            MouseEventKind::ScrollUp => {
+                if let Some(m) = &mut self.context_menu {
+                    m.selected_index = m.selected_index.saturating_sub(1);
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                if let Some(m) = &mut self.context_menu {
+                    m.selected_index =
+                        (m.selected_index + 1).min(m.items.len().saturating_sub(1));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn open_sidebar_context_menu(&mut self, x: u16, y: u16, unit_name: String) {
+        let items = vec![
+            ContextMenuItem {
+                label: "Start".into(),
+                action: ContextMenuAction::ServiceAction(ServiceAction::Start),
+            },
+            ContextMenuItem {
+                label: "Restart".into(),
+                action: ContextMenuAction::ServiceAction(ServiceAction::Restart),
+            },
+            ContextMenuItem {
+                label: "Stop".into(),
+                action: ContextMenuAction::ServiceAction(ServiceAction::Stop),
+            },
+            ContextMenuItem {
+                label: "Enable".into(),
+                action: ContextMenuAction::ServiceAction(ServiceAction::Enable),
+            },
+            ContextMenuItem {
+                label: "Disable".into(),
+                action: ContextMenuAction::ServiceAction(ServiceAction::Disable),
+            },
+            ContextMenuItem {
+                label: "Split Into Pane (H)".into(),
+                action: ContextMenuAction::SplitNewPaneHorizontal,
+            },
+            ContextMenuItem {
+                label: "Split Into Pane (V)".into(),
+                action: ContextMenuAction::SplitNewPaneVertical,
+            },
+        ];
+        self.context_menu = Some(ContextMenu {
+            x,
+            y,
+            items,
+            selected_index: 0,
+            target: ContextMenuTarget::SidebarService { unit_name },
+        });
+        self.input_mode = InputMode::ContextMenu;
+    }
+
+    fn open_pane_context_menu(&mut self, x: u16, y: u16, pane_id: PaneId) {
+        let items = vec![
+            ContextMenuItem {
+                label: "Split Horizontal".into(),
+                action: ContextMenuAction::SplitHorizontal,
+            },
+            ContextMenuItem {
+                label: "Split Vertical".into(),
+                action: ContextMenuAction::SplitVertical,
+            },
+            ContextMenuItem {
+                label: "Close Pane".into(),
+                action: ContextMenuAction::ClosePane,
+            },
+        ];
+        self.context_menu = Some(ContextMenu {
+            x,
+            y,
+            items,
+            selected_index: 0,
+            target: ContextMenuTarget::Pane { pane_id },
+        });
+        self.input_mode = InputMode::ContextMenu;
+    }
+
+    fn execute_context_menu_action(&mut self) {
+        let Some(menu) = self.context_menu.take() else {
+            return;
+        };
+        self.input_mode = InputMode::Normal;
+
+        let Some(item) = menu.items.get(menu.selected_index) else {
+            return;
+        };
+        let action = item.action;
+
+        match action {
+            ContextMenuAction::ServiceAction(sa) => {
+                if let ContextMenuTarget::SidebarService { unit_name } = menu.target {
+                    self.request_action_for_unit(sa, unit_name);
+                }
+            }
+            ContextMenuAction::SplitNewPaneHorizontal
+            | ContextMenuAction::SplitNewPaneVertical => {
+                if let ContextMenuTarget::SidebarService { unit_name } = menu.target {
+                    let dir = if action == ContextMenuAction::SplitNewPaneHorizontal {
+                        SplitDirection::Horizontal
+                    } else {
+                        SplitDirection::Vertical
+                    };
+                    let priority = self.config.log.priority;
+                    if let Some(new_id) = self.pane_tree.split(
+                        self.focused_pane,
+                        dir,
+                        unit_name.clone(),
+                        priority,
+                    ) {
+                        self.focused_pane = new_id;
+                        let bus_type = self.get_bus_type_for_service(&unit_name);
+                        self.start_journal_for_pane(new_id, &unit_name, bus_type, priority);
+                    }
+                }
+            }
+            ContextMenuAction::SplitHorizontal => {
+                if let ContextMenuTarget::Pane { pane_id } = menu.target {
+                    self.focused_pane = pane_id;
+                    self.split_pane(SplitDirection::Horizontal);
+                }
+            }
+            ContextMenuAction::SplitVertical => {
+                if let ContextMenuTarget::Pane { pane_id } = menu.target {
+                    self.focused_pane = pane_id;
+                    self.split_pane(SplitDirection::Vertical);
+                }
+            }
+            ContextMenuAction::ClosePane => {
+                if let ContextMenuTarget::Pane { pane_id } = menu.target {
+                    let next = self.pane_tree.next_leaf_id(pane_id);
+                    if self.pane_tree.close(pane_id) {
+                        self.focused_pane = next;
+                    }
+                }
+            }
+        }
+    }
+
+    fn request_action_for_unit(&mut self, action: ServiceAction, unit_name: String) {
+        if self.config.needs_confirmation(action.confirm_key()) {
+            self.confirm_dialog = Some(ConfirmDialog::new(action, unit_name));
+            self.input_mode = InputMode::Confirm;
+        } else {
+            self.execute_action_with_name(
+                action,
+                if action.needs_unit() {
+                    Some(unit_name)
+                } else {
+                    None
+                },
+            );
         }
     }
 

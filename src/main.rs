@@ -7,6 +7,7 @@ mod tui;
 mod ui;
 
 use anyhow::Result;
+use ratatui::widgets::ListState;
 use tracing_subscriber::EnvFilter;
 
 use app::App;
@@ -66,6 +67,7 @@ async fn main() -> Result<()> {
 
     // Initialize app
     let mut app = App::new(config, system_bus, session_bus, tx).await?;
+    let mut sidebar_list_state = ListState::default();
 
     // Initialize terminal
     let mut terminal = tui::init()?;
@@ -102,7 +104,13 @@ async fn main() -> Result<()> {
         }
 
         if is_render {
-            terminal.draw(|frame| ui::render(&app, frame))?;
+            let mut cache = None;
+            terminal.draw(|frame| {
+                cache = Some(ui::render(&app, &mut sidebar_list_state, frame));
+            })?;
+            if let Some(c) = cache {
+                app.layout_cache = c;
+            }
         }
     }
 
