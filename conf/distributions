@@ -1,0 +1,7 @@
+Origin: sysdui
+Label: sysdui
+Codename: stable
+Architectures: amd64
+Components: main
+Description: sysdui APT repository
+SignWith: 4B1381326B1258D94B7559846BD38CA281A72F27
