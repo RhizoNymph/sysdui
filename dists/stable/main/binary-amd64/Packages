@@ -1,0 +1,19 @@
+Package: sysdui
+Version: 0.1.0-1
+Architecture: amd64
+Homepage: https://github.com/RhizoNymph/sysdui
+Maintainer: RhizoNymph <82485126+RhizoNymph@users.noreply.github.com>
+Installed-Size: 4609
+Depends: dbus, libc6 (>= 2.39), systemd
+Priority: optional
+Section: admin
+Filename: pool/main/s/sysdui/sysdui_0.1.0-1_amd64.deb
+Size: 1480708
+SHA256: 2394fa3d37c58b2d0c228a84d8afd7700fc3c2a09c0d4ce1ab05e3dfe5165a97
+SHA1: f236479986fb12293dbe51cf569bff5a3667243c
+MD5sum: 1e39b45fcfa1e7396817a701a14cdfd1
+Description: A terminal UI for managing systemd services
+ Browse services, watch live logs, and control service lifecycle from one
+ screen. Features fuzzy search, live log tailing, pane splitting, and automatic
+ privilege escalation.
+

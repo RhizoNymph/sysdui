@@ -1,0 +1,5 @@
+Component: main
+Origin: sysdui
+Label: sysdui
+Architecture: amd64
+Description: sysdui APT repository

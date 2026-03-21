@@ -1,0 +1,19 @@
+Origin: sysdui
+Label: sysdui
+Codename: stable
+Date: Sat, 21 Mar 2026 02:34:50 UTC
+Architectures: amd64
+Components: main
+Description: sysdui APT repository
+MD5Sum:
+ 8c33c79272bc29c89e7d78e44b8c91e1 729 main/binary-amd64/Packages
+ c25e8e9c7c090dc21ea11d3c035ee094 511 main/binary-amd64/Packages.gz
+ 70ff2c51f5a2f1bbfc1579bca56ac109 100 main/binary-amd64/Release
+SHA1:
+ 12124468d5b752c31c7105da97302e17b24c67d6 729 main/binary-amd64/Packages
+ e8b6399c2a92a2fa646ace7cbcaa2df43a828fe4 511 main/binary-amd64/Packages.gz
+ 6b43c629b47d1bd831b106fa3d5d78846b4eb135 100 main/binary-amd64/Release
+SHA256:
+ e983518ae37c27a05c2196fea9482ae6623ba1a26d6a88e4aeb9c6657a0fd36e 729 main/binary-amd64/Packages
+ 1c86c9b959c974d9b08f14e446b52ed0af18c1f95be81aa6441013be4145a5cb 511 main/binary-amd64/Packages.gz
+ 7f9c9e7dcd4721a8d546c704a117c7c400f05b50b7c3f4ee210467e30774e842 100 main/binary-amd64/Release
