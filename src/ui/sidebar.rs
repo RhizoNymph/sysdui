@@ -3,6 +3,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
 };
 
+use crate::app::ListMode;
 use crate::systemd::types::{ActiveState, UnitInfo};
 
 pub fn render_sidebar(
@@ -11,6 +12,8 @@ pub fn render_sidebar(
     units: &[UnitInfo],
     selected_index: usize,
     focused: bool,
+    include_list: &[String],
+    list_mode: ListMode,
 ) {
     let border_style = if focused {
         Style::default().fg(Color::Cyan)
@@ -36,7 +39,12 @@ pub fn render_sidebar(
             };
 
             let name = unit.short_name();
-            let text = format!("{icon} {name}");
+            let marker = if list_mode != ListMode::Include && include_list.contains(&unit.name) {
+                "★"
+            } else {
+                " "
+            };
+            let text = format!("{marker}{icon} {name}");
             ListItem::new(text).style(Style::default().fg(color))
         })
         .collect();

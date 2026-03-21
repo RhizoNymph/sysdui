@@ -72,6 +72,8 @@ pub fn render(app: &App, frame: &mut Frame) {
         &app.filtered_units,
         app.selected_index,
         sidebar_focused,
+        &app.config.filter.include,
+        app.list_mode,
     );
 
     // Split main panel: detail (top) + logs (bottom)
@@ -108,13 +110,22 @@ pub fn render(app: &App, frame: &mut Frame) {
         .split(help_area);
 
     // Status line
+    let mode_label = match app.list_mode {
+        crate::app::ListMode::Include => {
+            format!("{} ({})", app.list_mode.label(), app.config.filter.include.len())
+        }
+        crate::app::ListMode::Exclude => {
+            format!("{} ({})", app.list_mode.label(), app.config.filter.exclude.len())
+        }
+        crate::app::ListMode::All => app.list_mode.label().to_string(),
+    };
     let status_spans = vec![
         Span::styled(" [Scope: ", Style::default().fg(Color::DarkGray)),
         Span::styled(app.filter_mode.label(), Style::default().fg(Color::Cyan)),
         Span::styled("] [Status: ", Style::default().fg(Color::DarkGray)),
         Span::styled(app.status_filter.label(), Style::default().fg(Color::Cyan)),
         Span::styled("] [Mode: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(app.list_mode.label(), Style::default().fg(Color::Cyan)),
+        Span::styled(mode_label, Style::default().fg(Color::Cyan)),
         Span::styled("] [Sort: ", Style::default().fg(Color::DarkGray)),
         Span::styled(app.sort_mode.label(), Style::default().fg(Color::Cyan)),
         Span::styled("]", Style::default().fg(Color::DarkGray)),

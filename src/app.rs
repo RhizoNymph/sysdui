@@ -59,13 +59,15 @@ impl FilterMode {
 pub enum ListMode {
     All,
     Include,
+    Exclude,
 }
 
 impl ListMode {
-    pub fn toggle(self) -> Self {
+    pub fn cycle_next(self) -> Self {
         match self {
             Self::All => Self::Include,
-            Self::Include => Self::All,
+            Self::Include => Self::Exclude,
+            Self::Exclude => Self::All,
         }
     }
 
@@ -73,6 +75,7 @@ impl ListMode {
         match self {
             Self::All => "All",
             Self::Include => "Include",
+            Self::Exclude => "Exclude",
         }
     }
 }
@@ -179,6 +182,7 @@ impl App {
 
         let list_mode = match config.filter.mode.as_str() {
             "include" => ListMode::Include,
+            "exclude" => ListMode::Exclude,
             _ => ListMode::All,
         };
 
@@ -280,6 +284,9 @@ impl App {
             }
             ListMode::All => {
                 filtered.retain(|u| !self.config.filter.exclude.contains(&u.name));
+            }
+            ListMode::Exclude => {
+                filtered.retain(|u| self.config.filter.exclude.contains(&u.name));
             }
         }
 
@@ -521,8 +528,34 @@ impl App {
                 self.apply_filters();
             }
             KeyAction::ToggleListMode => {
-                self.list_mode = self.list_mode.toggle();
+                self.list_mode = self.list_mode.cycle_next();
                 self.apply_filters();
+            }
+            KeyAction::ToggleInclude => {
+                if let Some(name) = self.selected_unit_name() {
+                    if let Some(pos) = self.config.filter.include.iter().position(|s| *s == name) {
+                        self.config.filter.include.remove(pos);
+                    } else {
+                        self.config.filter.include.push(name.clone());
+                        // Mutual exclusion: remove from exclude if present
+                        self.config.filter.exclude.retain(|s| *s != name);
+                    }
+                    self.apply_filters();
+                    self.save_filter_lists();
+                }
+            }
+            KeyAction::ToggleExclude => {
+                if let Some(name) = self.selected_unit_name() {
+                    if let Some(pos) = self.config.filter.exclude.iter().position(|s| *s == name) {
+                        self.config.filter.exclude.remove(pos);
+                    } else {
+                        self.config.filter.exclude.push(name.clone());
+                        // Mutual exclusion: remove from include if present
+                        self.config.filter.include.retain(|s| *s != name);
+                    }
+                    self.apply_filters();
+                    self.save_filter_lists();
+                }
             }
             KeyAction::CycleSort => {
                 self.sort_mode = self.sort_mode.cycle_next();
@@ -776,6 +809,15 @@ impl App {
             fragment_path,
             bus_type,
         });
+    }
+
+    fn save_filter_lists(&self) {
+        if let Err(e) = crate::config::save_filter_lists(
+            &self.config.filter.include,
+            &self.config.filter.exclude,
+        ) {
+            tracing::warn!("Failed to save filter config: {e}");
+        }
     }
 
     fn split_pane(&mut self, direction: SplitDirection) {

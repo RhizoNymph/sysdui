@@ -171,6 +171,58 @@ pub fn load_config() -> Result<Config> {
     Ok(config)
 }
 
+pub fn save_filter_lists(include: &[String], exclude: &[String]) -> Result<()> {
+    let path = config_path();
+
+    let mut root: toml::Value = if path.exists() {
+        let content = std::fs::read_to_string(&path)?;
+        content.parse::<toml::Value>()?
+    } else {
+        toml::Value::Table(toml::map::Map::new())
+    };
+
+    let table = root
+        .as_table_mut()
+        .ok_or_else(|| anyhow::anyhow!("config root is not a table"))?;
+    if !table.contains_key("filter") {
+        table.insert(
+            "filter".to_string(),
+            toml::Value::Table(toml::map::Map::new()),
+        );
+    }
+    let filter = table["filter"]
+        .as_table_mut()
+        .ok_or_else(|| anyhow::anyhow!("[filter] is not a table"))?;
+
+    filter.insert(
+        "include".to_string(),
+        toml::Value::Array(
+            include
+                .iter()
+                .map(|s| toml::Value::String(s.clone()))
+                .collect(),
+        ),
+    );
+    filter.insert(
+        "exclude".to_string(),
+        toml::Value::Array(
+            exclude
+                .iter()
+                .map(|s| toml::Value::String(s.clone()))
+                .collect(),
+        ),
+    );
+
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let output = toml::to_string_pretty(&root)?;
+    std::fs::write(&path, output)?;
+
+    Ok(())
+}
+
 // Raw TOML deserialization types (all fields optional for partial configs)
 #[derive(Deserialize)]
 struct RawConfig {
