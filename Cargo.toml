@@ -2,6 +2,10 @@
 name = "sysdui"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "A terminal UI for managing systemd services"
+homepage = "https://github.com/RhizoNymph/sysdui"
+repository = "https://github.com/RhizoNymph/sysdui"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -19,3 +23,23 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 futures = "0.3"
 tokio-stream = "0.1"
+
+[package.metadata.deb]
+maintainer = "RhizoNymph <82485126+RhizoNymph@users.noreply.github.com>"
+copyright = "2025-2026 RhizoNymph"
+license-file = ["LICENSE", "0"]
+extended-description = """\
+Browse services, watch live logs, and control service lifecycle \
+from one screen. Features fuzzy search, live log tailing, pane \
+splitting, and automatic privilege escalation."""
+section = "admin"
+priority = "optional"
+depends = "$auto, systemd, dbus"
+assets = [
+    ["target/release/sysdui", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/sysdui/README.md", "644"],
+]
+
+[profile.release]
+strip = true
+lto = true

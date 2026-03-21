@@ -6,6 +6,17 @@ A terminal UI for managing systemd services. Browse services, watch live logs, a
 
 ## Install
 
+### From APT (Debian/Ubuntu)
+
+```sh
+curl -fsSL https://rhizonymph.github.io/sysdui/gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/sysdui.gpg
+echo "deb [signed-by=/usr/share/keyrings/sysdui.gpg] https://rhizonymph.github.io/sysdui stable main" | sudo tee /etc/apt/sources.list.d/sysdui.list
+sudo apt update
+sudo apt install sysdui
+```
+
+### From source
+
 Requires Rust 1.85+ (edition 2024).
 
 ```sh
