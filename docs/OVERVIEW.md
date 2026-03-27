@@ -1,57 +1,113 @@
-# sysdui Overview
+Overview:
+    description:
+        sysdui is a terminal-based UI for managing systemd services on Linux. It provides
+        a modern, interactive interface to browse, monitor, and control systemd services
+        (both system and user) with features like live log streaming, service status monitoring,
+        fuzzy search, and multi-pane log viewing. Built in Rust using ratatui for rendering,
+        crossterm for terminal events, and zbus for D-Bus communication with systemd.
 
-## Description
+    subsystems:
+        App State Machine (src/app.rs):
+            Central state machine that manages all application state and business logic.
+            Processes events from the event system and coordinates between all other subsystems.
+            Owns the pane tree, service list, input mode state machine, and filter/sort state.
 
-sysdui is a terminal UI application for managing systemd services, built in Rust using ratatui. It provides a single-screen interface to browse services, watch live logs, and control service lifecycle with features like fuzzy search, log tailing, pane splitting, and automatic privilege escalation.
+        Event System (src/event.rs):
+            Async event dispatch layer using tokio mpsc channels. Multiplexes terminal input,
+            D-Bus signals, tick timers (~4Hz), render timers (~30Hz), journal log lines, and
+            command results into a single AppEvent stream consumed by the App state machine.
 
-## Subsystems
+        Systemd Module (src/systemd/):
+            Interface to systemd via D-Bus (zbus). Handles listing units, subscribing to signals,
+            querying service details, and executing systemctl commands. Supports both system and
+            session buses.
 
-- **app** (`src/app.rs`): Central application state and event dispatch. Contains `App` struct, input mode handling, and all state mutation logic.
-- **config** (`src/config/`): Configuration loading from TOML files and key binding management.
-- **state** (`src/state.rs`): Session state persistence - saves/restores UI state across application restarts.
-- **event** (`src/event.rs`): Event handling infrastructure - terminal events, D-Bus signals, timers.
-- **journal** (`src/journal/`): Journal log streaming and filtering by priority level.
-- **systemd** (`src/systemd/`): D-Bus communication with systemd, unit listing, service control commands.
-- **tui** (`src/tui.rs`): Terminal initialization, suspend/resume for blocking operations.
-- **ui** (`src/ui/`): Rendering layer - sidebar, detail pane, log panes, confirm dialogs, context menus, help overlay.
+        Journal Module (src/journal/):
+            Manages live log streaming by spawning journalctl processes and forwarding output as
+            AppEvents. Includes log filtering by priority level and text search matching.
 
-## Data Flow
+        Config Module (src/config/):
+            Loads and saves user configuration from ~/.config/sysdui/config.toml. Manages filter
+            settings (include/exclude lists), keybindings, confirmation preferences, log defaults,
+            and sort preferences. Only include/exclude lists are persisted back at runtime.
 
-1. `main.rs` sets up D-Bus connections, event handler, and creates `App`.
-2. `EventHandler` multiplexes terminal input, D-Bus signals, and tick/render timers into `AppEvent`.
-3. `App::handle_event()` dispatches events to key/mouse/tick/signal handlers that mutate `App` state.
-4. On render events, `ui::render()` reads `App` state and draws the TUI.
-5. State-modifying actions (filter changes, pane operations, service selection) trigger `save_state()` to persist session.
-6. On startup, `App::new()` attempts to restore session state from disk before falling back to config defaults.
+        UI Module (src/ui/):
+            Rendering layer using ratatui. Manages layout computation, sidebar rendering, detail
+            panel, log panes, search bar overlay, help screen, confirmation dialogs, context menus,
+            and status bar. Produces a LayoutCache for mouse hit-testing.
 
-## Features Index
+        TUI Module (src/tui.rs):
+            Low-level terminal initialization (raw mode, alternate screen, mouse capture),
+            suspension for blocking operations (systemctl, editor), and restoration.
 
-### session_state
-- description: Persists UI session state (filters, sort, pane layout, selected service) to disk and restores on startup. Includes Ctrl-r hotkey to reset state to defaults.
-- entry_points: [App::new, App::save_state, App::reset_state]
-- depends_on: [config, panes]
-- doc: docs/features/session_state.md
+    data_flow:
+        1. Initialization: main.rs sets up logging, loads config, connects to system and session
+           D-Bus buses, subscribes to systemd signals, spawns event handlers (terminal reader,
+           tick timer at ~4Hz, render timer at ~30Hz), initializes App state, and loads all units.
 
-### pane_management
-- description: Split-pane log viewing with horizontal/vertical splits, focus cycling, and close operations.
-- entry_points: [App::split_pane, App::select_service, PaneTree]
-- depends_on: [journal]
-- doc: (not yet documented)
+        2. Event Loop: All inputs converge into AppEvent via tokio mpsc channels. Terminal events
+           (keyboard/mouse) come from crossterm, D-Bus signals (UnitNew, UnitRemoved,
+           PropertiesChanged) come from zbus signal listeners, journal log lines come from spawned
+           journalctl processes, and timers fire at fixed intervals.
 
-### service_control
-- description: Start, stop, restart, enable, disable services and daemon-reload via systemctl with confirmation dialogs.
-- entry_points: [App::request_action, App::execute_action_with_name]
-- depends_on: [systemd]
-- doc: (not yet documented)
+        3. State Processing: App::handle_event() dispatches events to handle_key(), handle_mouse(),
+           handle_tick(), or D-Bus signal handlers. These mutate App state (selected_index,
+           filter/sort settings, pane tree, input mode, etc.) and call apply_filters() to
+           recompute the visible service list.
 
-### filtering_and_sorting
-- description: Filter services by bus type, status, include/exclude lists, and fuzzy search. Sort by name, status, or uptime.
-- entry_points: [App::apply_filters, App::navigate]
-- depends_on: [config]
-- doc: (not yet documented)
+        4. Rendering: On each Render event (~30Hz), ui::render() reads App state and draws the
+           frame: sidebar (service list), detail panel (selected service info), log panes (binary
+           tree layout), and overlays (search bar, help, confirm dialog, context menu).
 
-### key_bindings
-- description: Configurable key bindings with defaults and TOML-based overrides.
-- entry_points: [KeyBindings, apply_config_keys]
-- depends_on: [config]
-- doc: (not yet documented)
+        5. Blocking Operations: Service actions (start/stop/restart/etc.) and editor launch suspend
+           the TUI (tui::suspend()), run the command in the foreground terminal, then resume
+           (tui::resume()) and reload units.
+
+Features Index:
+    service_browsing:
+        description: Browse, filter, sort, and fuzzy-search systemd services across system and user scopes
+        entry_points: [src/app.rs:apply_filters, src/ui/sidebar.rs:render_sidebar]
+        depends_on: [dbus_communication, configuration]
+        doc: docs/features/service_browsing.md
+
+    service_control:
+        description: Start, stop, restart, enable, disable, daemon-reload services and edit unit files with privilege escalation
+        entry_points: [src/app.rs:request_action, src/app.rs:execute_action, src/systemd/commands.rs:execute_systemctl]
+        depends_on: [service_browsing, configuration]
+        doc: docs/features/service_control.md
+
+    log_streaming:
+        description: Live-tail journalctl logs per service with priority filtering, text search, and scrollback
+        entry_points: [src/journal/mod.rs:spawn_journal_stream, src/ui/logs.rs:render_log_pane]
+        depends_on: [pane_management]
+        doc: docs/features/log_streaming.md
+
+    pane_management:
+        description: Tmux-like binary tree pane splitting for viewing multiple service logs simultaneously
+        entry_points: [src/ui/panes.rs:PaneTree, src/app.rs:split_pane]
+        depends_on: [log_streaming]
+        doc: docs/features/pane_management.md
+
+    configuration:
+        description: TOML-based user configuration for filters, keybindings, confirmations, log defaults, and sort preferences
+        entry_points: [src/config/mod.rs:load_config, src/config/keys.rs:KeyBindings]
+        depends_on: []
+        doc: docs/features/configuration.md
+
+    dbus_communication:
+        description: D-Bus interface to systemd for listing units, subscribing to signals, and querying service details
+        entry_points: [src/systemd/dbus.rs:list_units, src/systemd/dbus.rs:spawn_signal_listener]
+        depends_on: []
+        doc: docs/features/dbus_communication.md
+
+    event_system:
+        description: Async event dispatch multiplexing terminal input, D-Bus signals, timers, and journal output into a unified AppEvent stream
+        entry_points: [src/event.rs:EventHandler, src/app.rs:handle_event]
+        depends_on: []
+        doc: docs/features/event_system.md
+
+    ui_rendering:
+        description: Terminal UI rendering with layout computation, sidebar, detail panel, log panes, and overlay widgets
+        entry_points: [src/ui/mod.rs:render, src/ui/mod.rs:LayoutCache]
+        depends_on: [service_browsing, log_streaming, pane_management]
+        doc: docs/features/ui_rendering.md
