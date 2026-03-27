@@ -5,14 +5,29 @@ use ratatui::{
 
 use crate::systemd::commands::ServiceAction;
 
+pub enum ConfirmAction {
+    ServiceAction {
+        action: ServiceAction,
+        unit_name: String,
+    },
+    ResetState,
+}
+
 pub struct ConfirmDialog {
-    pub action: ServiceAction,
-    pub unit_name: String,
+    pub action: ConfirmAction,
 }
 
 impl ConfirmDialog {
-    pub fn new(action: ServiceAction, unit_name: String) -> Self {
-        Self { action, unit_name }
+    pub fn new_service(action: ServiceAction, unit_name: String) -> Self {
+        Self {
+            action: ConfirmAction::ServiceAction { action, unit_name },
+        }
+    }
+
+    pub fn new_reset() -> Self {
+        Self {
+            action: ConfirmAction::ResetState,
+        }
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
@@ -31,14 +46,21 @@ impl ConfirmDialog {
             .border_style(Style::default().fg(Color::Yellow))
             .title(" Confirm ");
 
-        let msg = if self.action.needs_unit() {
-            format!(
-                "{} {}?\n\n[y]es / any key to cancel",
-                self.action.label(),
-                self.unit_name
-            )
-        } else {
-            format!("{}?\n\n[y]es / any key to cancel", self.action.label())
+        let msg = match &self.action {
+            ConfirmAction::ServiceAction { action, unit_name } => {
+                if action.needs_unit() {
+                    format!(
+                        "{} {}?\n\n[y]es / any key to cancel",
+                        action.label(),
+                        unit_name
+                    )
+                } else {
+                    format!("{}?\n\n[y]es / any key to cancel", action.label())
+                }
+            }
+            ConfirmAction::ResetState => {
+                "Reset all state to defaults?\n\n[y]es / any key to cancel".to_string()
+            }
         };
 
         let p = Paragraph::new(msg)

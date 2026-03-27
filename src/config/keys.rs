@@ -37,6 +37,7 @@ pub enum KeyAction {
     SplitHorizontal,
     SplitVertical,
     Escape,
+    ResetState,
 }
 
 #[allow(dead_code)]
@@ -76,6 +77,7 @@ impl KeyAction {
             Self::SplitHorizontal => "split h",
             Self::SplitVertical => "split v",
             Self::Escape => "escape",
+            Self::ResetState => "reset",
         }
     }
 
@@ -153,6 +155,10 @@ impl Default for KeyBindings {
         map.insert(key('?'), KeyAction::ShowHelp);
         map.insert(key('y'), KeyAction::Confirm);
         map.insert(key_code(KeyCode::Esc), KeyAction::Escape);
+        map.insert(
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+            KeyAction::ResetState,
+        );
         Self { map }
     }
 }
@@ -289,6 +295,7 @@ pub fn apply_config_keys(
         ("cycle_log_level", KeyAction::CycleLogLevel),
         ("quit", KeyAction::Quit),
         ("show_help", KeyAction::ShowHelp),
+        ("reset_state", KeyAction::ResetState),
     ]);
 
     for (name, combo_str) in keys {

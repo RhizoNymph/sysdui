@@ -20,7 +20,7 @@ use crate::systemd::commands::{ServiceAction, edit_unit_file, execute_systemctl}
 use crate::systemd::dbus;
 use crate::systemd::types::*;
 use crate::ui::LayoutCache;
-use crate::ui::confirm::ConfirmDialog;
+use crate::ui::confirm::{ConfirmAction, ConfirmDialog};
 use crate::ui::context_menu::{
     ContextMenu, ContextMenuAction, ContextMenuItem, ContextMenuTarget, compute_menu_rect,
 };
@@ -192,25 +192,26 @@ impl App {
         session_bus: Connection,
         tx: mpsc::UnboundedSender<AppEvent>,
     ) -> Result<Self> {
-        let filter_mode = match config.filter.show.as_str() {
+        // Compute config defaults
+        let config_filter_mode = match config.filter.show.as_str() {
             "user" => FilterMode::User,
             "system" => FilterMode::System,
             _ => FilterMode::Both,
         };
 
-        let list_mode = match config.filter.mode.as_str() {
+        let config_list_mode = match config.filter.mode.as_str() {
             "include" => ListMode::Include,
             "exclude" => ListMode::Exclude,
             _ => ListMode::All,
         };
 
-        let sort_mode = match config.sort.default.as_str() {
+        let config_sort_mode = match config.sort.default.as_str() {
             "status" => SortMode::Status,
             "uptime" => SortMode::Uptime,
             _ => SortMode::Name,
         };
 
-        let status_filter = match config.filter.status.as_str() {
+        let config_status_filter = match config.filter.status.as_str() {
             "active" => StatusFilter::Active,
             "inactive" => StatusFilter::Inactive,
             "failed" => StatusFilter::Failed,
@@ -218,6 +219,45 @@ impl App {
         };
 
         let priority = config.log.priority;
+
+        // Try to restore session state
+        let session = match crate::state::load_session() {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!("Failed to load session state: {e}");
+                None
+            }
+        };
+
+        let (filter_mode, status_filter, list_mode, sort_mode, pane_tree, focused_pane, selected_service) =
+            if let Some(ref session) = session {
+                let fm = match session.filter_mode.as_str() {
+                    "user" => FilterMode::User,
+                    "system" => FilterMode::System,
+                    _ => FilterMode::Both,
+                };
+                let sf = match session.status_filter.as_str() {
+                    "active" => StatusFilter::Active,
+                    "inactive" => StatusFilter::Inactive,
+                    "failed" => StatusFilter::Failed,
+                    _ => StatusFilter::All,
+                };
+                let lm = match session.list_mode.as_str() {
+                    "include" => ListMode::Include,
+                    "exclude" => ListMode::Exclude,
+                    _ => ListMode::All,
+                };
+                let sm = match session.sort_mode.as_str() {
+                    "status" => SortMode::Status,
+                    "uptime" => SortMode::Uptime,
+                    _ => SortMode::Name,
+                };
+                let tree = session.to_pane_tree();
+                (fm, sf, lm, sm, tree, session.focused_pane, session.selected_service.clone())
+            } else {
+                let tree = PaneTree::new(String::new(), priority);
+                (config_filter_mode, config_status_filter, config_list_mode, config_sort_mode, tree, 1, None)
+            };
 
         let mut app = Self {
             all_units: Vec::new(),
@@ -229,8 +269,8 @@ impl App {
             list_mode,
             sort_mode,
             search_query: String::new(),
-            pane_tree: PaneTree::new(String::new(), priority),
-            focused_pane: 1,
+            pane_tree,
+            focused_pane,
             input_mode: InputMode::Normal,
             confirm_dialog: None,
             context_menu: None,
@@ -246,6 +286,18 @@ impl App {
 
         app.load_units().await?;
         app.apply_filters();
+
+        // Restore selected service index from session
+        if let Some(ref svc_name) = selected_service {
+            if let Some(idx) = app.filtered_units.iter().position(|u| u.name == *svc_name) {
+                app.selected_index = idx;
+            }
+        }
+
+        // Start journal streams for all restored panes
+        if session.is_some() {
+            app.start_all_journal_streams();
+        }
 
         Ok(app)
     }
@@ -485,7 +537,14 @@ impl App {
                 match self.config.keys.get(&key) {
                     Some(KeyAction::Confirm) => {
                         if let Some(dialog) = self.confirm_dialog.take() {
-                            self.execute_action(dialog);
+                            match dialog.action {
+                                ConfirmAction::ServiceAction { action, unit_name } => {
+                                    self.execute_action_from_confirm(action, unit_name);
+                                }
+                                ConfirmAction::ResetState => {
+                                    self.reset_state().await;
+                                }
+                            }
                         }
                         self.input_mode = InputMode::Normal;
                     }
@@ -566,14 +625,17 @@ impl App {
                 self.filter_mode = self.filter_mode.cycle_next();
                 self.load_units().await.ok();
                 self.apply_filters();
+                self.save_state();
             }
             KeyAction::CycleStatusFilter => {
                 self.status_filter = self.status_filter.cycle_next();
                 self.apply_filters();
+                self.save_state();
             }
             KeyAction::ToggleListMode => {
                 self.list_mode = self.list_mode.cycle_next();
                 self.apply_filters();
+                self.save_state();
             }
             KeyAction::ToggleInclude => {
                 if let Some(name) = self.selected_unit_name() {
@@ -604,6 +666,7 @@ impl App {
             KeyAction::CycleSort => {
                 self.sort_mode = self.sort_mode.cycle_next();
                 self.apply_filters();
+                self.save_state();
             }
             KeyAction::CycleLogLevel => {
                 // Extract needed values first to avoid borrow conflicts
@@ -621,6 +684,7 @@ impl App {
                     let bus_type = self.get_bus_type_for_service(&svc);
                     self.start_journal_for_pane(self.focused_pane, &svc, bus_type, priority);
                 }
+                self.save_state();
             }
             KeyAction::Start => self.request_action(ServiceAction::Start),
             KeyAction::Stop => self.request_action(ServiceAction::Stop),
@@ -638,9 +702,11 @@ impl App {
                 if self.pane_tree.close(old_id) {
                     self.focused_pane = next;
                 }
+                self.save_state();
             }
             KeyAction::CycleFocus => {
                 self.focused_pane = self.pane_tree.next_leaf_id(self.focused_pane);
+                self.save_state();
             }
             KeyAction::ShowHelp => {
                 self.input_mode = InputMode::Help;
@@ -667,6 +733,10 @@ impl App {
             }
             KeyAction::Escape => {
                 self.input_mode = InputMode::Normal;
+            }
+            KeyAction::ResetState => {
+                self.confirm_dialog = Some(ConfirmDialog::new_reset());
+                self.input_mode = InputMode::Confirm;
             }
             _ => {}
         }
@@ -779,18 +849,22 @@ impl App {
                                     self.filter_mode = self.filter_mode.cycle_next();
                                     self.load_units().await.ok();
                                     self.apply_filters();
+                                    self.save_state();
                                 }
                                 1 => {
                                     self.status_filter = self.status_filter.cycle_next();
                                     self.apply_filters();
+                                    self.save_state();
                                 }
                                 2 => {
                                     self.list_mode = self.list_mode.cycle_next();
                                     self.apply_filters();
+                                    self.save_state();
                                 }
                                 3 => {
                                     self.sort_mode = self.sort_mode.cycle_next();
                                     self.apply_filters();
+                                    self.save_state();
                                 }
                                 _ => {}
                             }
@@ -816,6 +890,7 @@ impl App {
                     let next = self.pane_tree.next_leaf_id(pane_id);
                     if self.pane_tree.close(pane_id) {
                         self.focused_pane = next;
+                        self.save_state();
                     }
                 }
             }
@@ -969,6 +1044,7 @@ impl App {
                         self.focused_pane = new_id;
                         let bus_type = self.get_bus_type_for_service(&unit_name);
                         self.start_journal_for_pane(new_id, &unit_name, bus_type, priority);
+                        self.save_state();
                     }
                 }
             }
@@ -989,6 +1065,7 @@ impl App {
                     let next = self.pane_tree.next_leaf_id(pane_id);
                     if self.pane_tree.close(pane_id) {
                         self.focused_pane = next;
+                        self.save_state();
                     }
                 }
             }
@@ -997,7 +1074,7 @@ impl App {
 
     fn request_action_for_unit(&mut self, action: ServiceAction, unit_name: String) {
         if self.config.needs_confirmation(action.confirm_key()) {
-            self.confirm_dialog = Some(ConfirmDialog::new(action, unit_name));
+            self.confirm_dialog = Some(ConfirmDialog::new_service(action, unit_name));
             self.input_mode = InputMode::Confirm;
         } else {
             self.execute_action_with_name(
@@ -1061,6 +1138,7 @@ impl App {
             }
 
             self.start_journal_for_pane(self.focused_pane, &name, bus_type, priority);
+            self.save_state();
         }
     }
 
@@ -1114,20 +1192,20 @@ impl App {
         };
 
         if self.config.needs_confirmation(action.confirm_key()) {
-            self.confirm_dialog = Some(ConfirmDialog::new(action, unit_name));
+            self.confirm_dialog = Some(ConfirmDialog::new_service(action, unit_name));
             self.input_mode = InputMode::Confirm;
         } else {
             self.execute_action_with_name(action, if action.needs_unit() { Some(unit_name) } else { None });
         }
     }
 
-    fn execute_action(&mut self, dialog: ConfirmDialog) {
-        let unit_name = if dialog.action.needs_unit() {
-            Some(dialog.unit_name)
+    fn execute_action_from_confirm(&mut self, action: ServiceAction, unit_name: String) {
+        let unit_name_opt = if action.needs_unit() {
+            Some(unit_name)
         } else {
             None
         };
-        self.execute_action_with_name(dialog.action, unit_name);
+        self.execute_action_with_name(action, unit_name_opt);
     }
 
     fn execute_action_with_name(&mut self, action: ServiceAction, unit_name: Option<String>) {
@@ -1189,6 +1267,7 @@ impl App {
                 let bus_type = self.get_bus_type_for_service(&service_name);
                 self.start_journal_for_pane(new_id, &service_name, bus_type, priority);
             }
+            self.save_state();
         }
     }
 
@@ -1280,6 +1359,87 @@ impl App {
                 }
             }
         }
+    }
+
+    fn save_state(&self) {
+        let state = crate::state::SessionState {
+            filter_mode: self.filter_mode.label().to_lowercase(),
+            status_filter: self.status_filter.label().to_lowercase(),
+            list_mode: self.list_mode.label().to_lowercase(),
+            sort_mode: self.sort_mode.label().to_lowercase(),
+            selected_service: self.selected_unit_name(),
+            focused_pane: self.focused_pane,
+            next_pane_id: self.pane_tree.next_id,
+            pane_tree: crate::state::SerializedPaneNode::from_pane_node(&self.pane_tree.root),
+        };
+        if let Err(e) = crate::state::save_session(&state) {
+            tracing::warn!("Failed to save session state: {e}");
+        }
+    }
+
+    fn start_all_journal_streams(&mut self) {
+        let pane_info: Vec<_> = self
+            .pane_tree
+            .leaf_ids()
+            .into_iter()
+            .filter_map(|id| {
+                self.pane_tree
+                    .get_leaf(id)
+                    .map(|p| (id, p.service_name.clone(), p.priority_filter))
+            })
+            .collect();
+
+        for (id, svc, priority) in pane_info {
+            if !svc.is_empty() {
+                let bus_type = self.get_bus_type_for_service(&svc);
+                self.start_journal_for_pane(id, &svc, bus_type, priority);
+            }
+        }
+    }
+
+    async fn reset_state(&mut self) {
+        // Abort all journal handles
+        for id in self.pane_tree.leaf_ids() {
+            if let Some(pane) = self.pane_tree.get_leaf_mut(id) {
+                if let Some(h) = pane.journal_handle.take() {
+                    h.abort();
+                }
+            }
+        }
+
+        // Reset to defaults from config
+        self.pane_tree = PaneTree::new(String::new(), self.config.log.priority);
+        self.focused_pane = 1;
+        self.filter_mode = match self.config.filter.show.as_str() {
+            "user" => FilterMode::User,
+            "system" => FilterMode::System,
+            _ => FilterMode::Both,
+        };
+        self.status_filter = match self.config.filter.status.as_str() {
+            "active" => StatusFilter::Active,
+            "inactive" => StatusFilter::Inactive,
+            "failed" => StatusFilter::Failed,
+            _ => StatusFilter::All,
+        };
+        self.list_mode = match self.config.filter.mode.as_str() {
+            "include" => ListMode::Include,
+            "exclude" => ListMode::Exclude,
+            _ => ListMode::All,
+        };
+        self.sort_mode = match self.config.sort.default.as_str() {
+            "status" => SortMode::Status,
+            "uptime" => SortMode::Uptime,
+            _ => SortMode::Name,
+        };
+        self.search_query.clear();
+        self.selected_index = 0;
+
+        if let Err(e) = crate::state::delete_session() {
+            tracing::warn!("Failed to delete session state: {e}");
+        }
+
+        self.load_units().await.ok();
+        self.apply_filters();
     }
 
     /// Execute a suspended action (called from main loop after TUI is suspended).

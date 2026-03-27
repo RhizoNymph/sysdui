@@ -2,6 +2,7 @@ mod app;
 mod config;
 mod event;
 mod journal;
+mod state;
 mod systemd;
 mod tui;
 mod ui;
