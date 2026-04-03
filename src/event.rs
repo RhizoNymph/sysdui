@@ -66,11 +66,10 @@ impl EventHandler {
         tokio::spawn(async move {
             let mut reader = EventStream::new();
             while let Some(event) = reader.next().await {
-                if let Ok(event) = event {
-                    if tx.send(AppEvent::Terminal(event)).is_err() {
+                if let Ok(event) = event
+                    && tx.send(AppEvent::Terminal(event)).is_err() {
                         break;
                     }
-                }
             }
         });
     }

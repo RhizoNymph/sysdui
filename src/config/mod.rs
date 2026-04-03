@@ -157,17 +157,15 @@ pub fn load_config() -> Result<Config> {
         }
     }
 
-    if let Some(l) = raw.log {
-        if let Some(v) = l.priority {
+    if let Some(l) = raw.log
+        && let Some(v) = l.priority {
             config.log.priority = Priority::from_str(&v);
         }
-    }
 
-    if let Some(s) = raw.sort {
-        if let Some(v) = s.default {
+    if let Some(s) = raw.sort
+        && let Some(v) = s.default {
             config.sort.default = v;
         }
-    }
 
     if let Some(k) = raw.keys {
         apply_config_keys(&mut config.keys, &k);

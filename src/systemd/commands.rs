@@ -74,11 +74,10 @@ pub fn execute_systemctl(
 
     cmd.arg(action.verb());
 
-    if let Some(unit) = unit_name {
-        if action.needs_unit() {
+    if let Some(unit) = unit_name
+        && action.needs_unit() {
             cmd.arg(unit);
         }
-    }
 
     let output = cmd
         .status()

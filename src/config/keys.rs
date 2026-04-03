@@ -225,11 +225,10 @@ pub fn parse_key_combo(s: &str) -> Option<KeyEvent> {
     };
 
     // If the char is uppercase, add SHIFT modifier
-    if let KeyCode::Char(c) = code {
-        if c.is_uppercase() && !modifiers.contains(KeyModifiers::SHIFT) {
+    if let KeyCode::Char(c) = code
+        && c.is_uppercase() && !modifiers.contains(KeyModifiers::SHIFT) {
             modifiers |= KeyModifiers::SHIFT;
         }
-    }
 
     Some(KeyEvent::new(code, modifiers))
 }
@@ -300,12 +299,11 @@ pub fn apply_config_keys(
     ]);
 
     for (name, combo_str) in keys {
-        if let Some(&action) = action_map.get(name.as_str()) {
-            if let Some(key_event) = parse_key_combo(combo_str) {
+        if let Some(&action) = action_map.get(name.as_str())
+            && let Some(key_event) = parse_key_combo(combo_str) {
                 // Remove old binding for this action
                 bindings.map.retain(|_, a| *a != action);
                 bindings.map.insert(key_event, action);
             }
-        }
     }
 }

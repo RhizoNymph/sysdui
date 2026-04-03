@@ -6,17 +6,28 @@ use ratatui::{
 use crate::app::ListMode;
 use crate::systemd::types::{ActiveState, UnitInfo};
 
+pub struct SidebarParams<'a> {
+    pub units: &'a [UnitInfo],
+    pub selected_index: usize,
+    pub focused: bool,
+    pub include_list: &'a [String],
+    pub list_mode: ListMode,
+}
+
 pub fn render_sidebar(
     frame: &mut Frame,
     area: Rect,
-    units: &[UnitInfo],
-    selected_index: usize,
-    focused: bool,
-    include_list: &[String],
-    list_mode: ListMode,
+    params: &SidebarParams<'_>,
     state: &mut ListState,
 ) {
-    let border_style = if focused {
+    let SidebarParams {
+        units,
+        selected_index,
+        focused,
+        include_list,
+        list_mode,
+    } = params;
+    let border_style = if *focused {
         Style::default().fg(Color::Cyan)
     } else {
         Style::default().fg(Color::DarkGray)
@@ -40,7 +51,7 @@ pub fn render_sidebar(
             };
 
             let name = unit.short_name();
-            let marker = if list_mode != ListMode::Include && include_list.contains(&unit.name) {
+            let marker = if *list_mode != ListMode::Include && include_list.contains(&unit.name) {
                 "★"
             } else {
                 " "
@@ -61,7 +72,7 @@ pub fn render_sidebar(
         .highlight_symbol("▶ ");
 
     if !units.is_empty() {
-        state.select(Some(selected_index));
+        state.select(Some(*selected_index));
     } else {
         state.select(None);
     }

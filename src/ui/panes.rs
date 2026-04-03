@@ -32,7 +32,6 @@ pub struct PaneLeaf {
 #[derive(Debug)]
 pub struct PaneSplit {
     pub direction: SplitDirection,
-    pub ratio: f32,
     pub children: [Box<PaneNode>; 2],
 }
 
@@ -154,7 +153,6 @@ fn find_and_split(
             let old_node = std::mem::replace(node, PaneNode::Leaf(dummy_leaf()));
             *node = PaneNode::Split(PaneSplit {
                 direction,
-                ratio: 0.5,
                 children: [Box::new(old_node), Box::new(PaneNode::Leaf(new_leaf))],
             });
             true
@@ -190,11 +188,10 @@ fn close_node(node: &mut PaneNode, target_id: PaneId) -> bool {
     let right_is_target = matches!(&*split.children[1], PaneNode::Leaf(l) if l.id == target_id);
 
     if left_is_target {
-        if let PaneNode::Leaf(leaf) = &*split.children[0] {
-            if let Some(h) = &leaf.journal_handle {
+        if let PaneNode::Leaf(leaf) = &*split.children[0]
+            && let Some(h) = &leaf.journal_handle {
                 h.abort();
             }
-        }
         let survivor = std::mem::replace(
             &mut split.children[1],
             Box::new(PaneNode::Leaf(dummy_leaf())),
@@ -202,11 +199,10 @@ fn close_node(node: &mut PaneNode, target_id: PaneId) -> bool {
         *node = *survivor;
         true
     } else if right_is_target {
-        if let PaneNode::Leaf(leaf) = &*split.children[1] {
-            if let Some(h) = &leaf.journal_handle {
+        if let PaneNode::Leaf(leaf) = &*split.children[1]
+            && let Some(h) = &leaf.journal_handle {
                 h.abort();
             }
-        }
         let survivor = std::mem::replace(
             &mut split.children[0],
             Box::new(PaneNode::Leaf(dummy_leaf())),
@@ -261,7 +257,7 @@ fn find_leaf(node: &PaneNode, target_id: PaneId) -> Option<&PaneLeaf> {
 /// When a split node has the same direction as its parent, its children are
 /// "promoted" so that the entire chain is treated as a single N-way split.
 /// Children that are leaves or cross-direction splits stop the recursion.
-fn flatten_same_direction<'a>(node: &'a PaneNode, direction: SplitDirection) -> Vec<&'a PaneNode> {
+fn flatten_same_direction(node: &PaneNode, direction: SplitDirection) -> Vec<&PaneNode> {
     match node {
         PaneNode::Split(split) if split.direction == direction => {
             let mut result = Vec::new();
@@ -320,7 +316,6 @@ mod tests {
     fn split(direction: SplitDirection, left: PaneNode, right: PaneNode) -> PaneNode {
         PaneNode::Split(PaneSplit {
             direction,
-            ratio: 0.5,
             children: [Box::new(left), Box::new(right)],
         })
     }

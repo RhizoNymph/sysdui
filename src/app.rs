@@ -315,11 +315,10 @@ impl App {
         app.apply_filters();
 
         // Restore selected service index from session
-        if let Some(ref svc_name) = selected_service {
-            if let Some(idx) = app.filtered_units.iter().position(|u| u.name == *svc_name) {
+        if let Some(ref svc_name) = selected_service
+            && let Some(idx) = app.filtered_units.iter().position(|u| u.name == *svc_name) {
                 app.selected_index = idx;
             }
-        }
 
         // Start journal streams for all restored panes
         if session.is_some() {
@@ -1193,8 +1192,8 @@ impl App {
                 .map(|p| p.priority_filter)
                 .unwrap_or(self.config.log.priority);
 
-            if let Some(pane) = self.pane_tree.get_leaf_mut(self.focused_pane) {
-                if pane.service_name != name {
+            if let Some(pane) = self.pane_tree.get_leaf_mut(self.focused_pane)
+                && pane.service_name != name {
                     pane.service_name = name.clone();
                     pane.log_buffer.clear();
                     pane.scroll_offset = 0;
@@ -1202,7 +1201,6 @@ impl App {
                         h.abort();
                     }
                 }
-            }
 
             self.start_journal_for_pane(self.focused_pane, &name, bus_type, priority);
             self.save_state();
@@ -1221,11 +1219,10 @@ impl App {
         }
 
         // Kill existing journal stream for this pane
-        if let Some(pane) = self.pane_tree.get_leaf_mut(pane_id) {
-            if let Some(h) = pane.journal_handle.take() {
+        if let Some(pane) = self.pane_tree.get_leaf_mut(pane_id)
+            && let Some(h) = pane.journal_handle.take() {
                 h.abort();
             }
-        }
 
         let tx = self.tx.clone();
         match journal::spawn_journal_stream(service_name, bus_type, priority, pane_id, tx) {
@@ -1472,11 +1469,10 @@ impl App {
     async fn reset_state(&mut self) {
         // Abort all journal handles
         for id in self.pane_tree.leaf_ids() {
-            if let Some(pane) = self.pane_tree.get_leaf_mut(id) {
-                if let Some(h) = pane.journal_handle.take() {
+            if let Some(pane) = self.pane_tree.get_leaf_mut(id)
+                && let Some(h) = pane.journal_handle.take() {
                     h.abort();
                 }
-            }
         }
 
         // Reset to defaults from config

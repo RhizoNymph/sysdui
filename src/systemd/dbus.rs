@@ -7,6 +7,19 @@ use zbus::zvariant::OwnedValue;
 use super::types::*;
 use crate::event::AppEvent;
 
+type ListUnitsEntry = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    zbus::zvariant::OwnedObjectPath,
+    u32,
+    String,
+    zbus::zvariant::OwnedObjectPath,
+);
+
 /// Connect to the system D-Bus.
 pub async fn system_bus() -> Result<Connection> {
     Connection::system()
@@ -35,18 +48,7 @@ pub async fn list_units(conn: &Connection, bus_type: BusType) -> Result<Vec<Unit
         .await
         .context("Failed to call ListUnits")?;
 
-    let units: Vec<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        zbus::zvariant::OwnedObjectPath,
-        u32,
-        String,
-        zbus::zvariant::OwnedObjectPath,
-    )> = reply.body().deserialize()?;
+    let units: Vec<ListUnitsEntry> = reply.body().deserialize()?;
 
     let result: Vec<UnitInfo> = units
         .into_iter()
@@ -144,8 +146,8 @@ pub async fn get_service_detail(conn: &Connection, object_path: &str) -> Result<
     let unit_iface = "org.freedesktop.systemd1.Unit";
     let svc_iface = "org.freedesktop.systemd1.Service";
 
-    if let Ok(reply) = unit_proxy.call_method("GetAll", &(unit_iface,)).await {
-        if let Ok(props) = reply.body().deserialize::<HashMap<String, OwnedValue>>() {
+    if let Ok(reply) = unit_proxy.call_method("GetAll", &(unit_iface,)).await
+        && let Ok(props) = reply.body().deserialize::<HashMap<String, OwnedValue>>() {
             if let Some(v) = props.get("ActiveState") {
                 detail.active_state = try_string(v);
             }
@@ -171,10 +173,9 @@ pub async fn get_service_detail(conn: &Connection, object_path: &str) -> Result<
                 detail.after = try_string_vec(v);
             }
         }
-    }
 
-    if let Ok(reply) = unit_proxy.call_method("GetAll", &(svc_iface,)).await {
-        if let Ok(props) = reply.body().deserialize::<HashMap<String, OwnedValue>>() {
+    if let Ok(reply) = unit_proxy.call_method("GetAll", &(svc_iface,)).await
+        && let Ok(props) = reply.body().deserialize::<HashMap<String, OwnedValue>>() {
             if let Some(v) = props.get("MainPID") {
                 detail.main_pid = try_u32(v);
             }
@@ -185,7 +186,6 @@ pub async fn get_service_detail(conn: &Connection, object_path: &str) -> Result<
                 detail.exec_main_start_timestamp = try_u64(v);
             }
         }
-    }
 
     Ok(detail)
 }
@@ -196,22 +196,18 @@ fn try_string(v: &OwnedValue) -> String {
 }
 
 fn try_string_vec(v: &OwnedValue) -> Vec<String> {
-    // Try to convert via serde deserialization
     use zbus::zvariant;
-    if let Ok(value) = zvariant::Value::try_from(v) {
-        // Try to iterate array elements
-        if let zvariant::Value::Array(arr) = &value {
-            return arr
-                .iter()
-                .filter_map(|item| {
-                    if let zvariant::Value::Str(s) = item {
-                        Some(s.to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-        }
+    if let Ok(zvariant::Value::Array(arr)) = zvariant::Value::try_from(v).as_ref() {
+        return arr
+            .iter()
+            .filter_map(|item| {
+                if let zvariant::Value::Str(s) = item {
+                    Some(s.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
     }
     vec![]
 }

@@ -14,6 +14,7 @@ use crate::app::App;
 use crate::app::InputMode;
 use crate::ui::panes::PaneId;
 
+#[derive(Default)]
 pub struct LayoutCache {
     pub sidebar_area: Rect,
     pub detail_area: Rect,
@@ -23,18 +24,6 @@ pub struct LayoutCache {
     pub frame_size: Rect,
 }
 
-impl Default for LayoutCache {
-    fn default() -> Self {
-        Self {
-            sidebar_area: Rect::default(),
-            detail_area: Rect::default(),
-            pane_rects: Vec::new(),
-            status_line_area: Rect::default(),
-            sidebar_scroll_offset: 0,
-            frame_size: Rect::default(),
-        }
-    }
-}
 
 pub fn render(app: &App, sidebar_state: &mut ListState, frame: &mut Frame) -> LayoutCache {
     let size = frame.area();
@@ -91,11 +80,13 @@ pub fn render(app: &App, sidebar_state: &mut ListState, frame: &mut Frame) -> La
     sidebar::render_sidebar(
         frame,
         sidebar_area,
-        &app.filtered_units,
-        app.selected_index,
-        sidebar_focused,
-        &app.config.filter.include,
-        app.list_mode,
+        &sidebar::SidebarParams {
+            units: &app.filtered_units,
+            selected_index: app.selected_index,
+            focused: sidebar_focused,
+            include_list: &app.config.filter.include,
+            list_mode: app.list_mode,
+        },
         sidebar_state,
     );
 
