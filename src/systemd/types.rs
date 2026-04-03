@@ -187,6 +187,7 @@ pub struct UnitInfo {
     pub unit_kind: UnitKind,
     pub bus_type: BusType,
     pub object_path: String,
+    pub unit_file_state: UnitFileState,
 }
 
 impl UnitInfo {

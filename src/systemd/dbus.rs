@@ -61,9 +61,53 @@ pub async fn list_units(conn: &Connection, bus_type: BusType) -> Result<Vec<Unit
                     object_path: object_path.to_string(),
                     name,
                     description,
+                    unit_file_state: UnitFileState::Unknown,
                 }
             },
         )
+        .collect();
+
+    Ok(result)
+}
+
+/// List all unit files from a given bus connection.
+/// Returns (unit_file_path, enablement_state) pairs.
+pub async fn list_unit_files(conn: &Connection, bus_type: BusType) -> Result<Vec<UnitInfo>> {
+    let proxy: zbus::Proxy<'_> = zbus::proxy::Builder::new(conn)
+        .destination("org.freedesktop.systemd1")?
+        .path("/org/freedesktop/systemd1")?
+        .interface("org.freedesktop.systemd1.Manager")?
+        .build()
+        .await?;
+
+    let reply = proxy
+        .call_method("ListUnitFiles", &())
+        .await
+        .context("Failed to call ListUnitFiles")?;
+
+    let files: Vec<(String, String)> = reply.body().deserialize()?;
+
+    let result: Vec<UnitInfo> = files
+        .into_iter()
+        .filter_map(|(path, state)| {
+            // Extract filename from path
+            let name = path.rsplit('/').next()?.to_string();
+            // Only include .service files
+            if !name.ends_with(".service") {
+                return None;
+            }
+            Some(UnitInfo {
+                unit_kind: UnitKind::Service,
+                load_state: LoadState::Unknown,
+                active_state: ActiveState::Inactive,
+                sub_state: String::new(),
+                bus_type,
+                object_path: String::new(),
+                name,
+                description: String::new(),
+                unit_file_state: UnitFileState::from_str(&state),
+            })
+        })
         .collect();
 
     Ok(result)

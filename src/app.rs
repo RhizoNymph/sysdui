@@ -157,6 +157,7 @@ pub struct App {
     pub status_filter: StatusFilter,
     pub list_mode: ListMode,
     pub sort_mode: SortMode,
+    pub show_disabled: bool,
     pub search_query: String,
     pub pane_tree: PaneTree,
     pub focused_pane: PaneId,
@@ -218,6 +219,8 @@ impl App {
             _ => StatusFilter::All,
         };
 
+        let show_disabled = config.filter.show_disabled;
+
         let priority = config.log.priority;
 
         // Try to restore session state
@@ -268,6 +271,7 @@ impl App {
             status_filter,
             list_mode,
             sort_mode,
+            show_disabled,
             search_query: String::new(),
             pane_tree,
             focused_pane,
@@ -322,6 +326,37 @@ impl App {
         // Only keep services
         units.retain(|u| u.is_service());
 
+        // Also fetch unit files to discover disabled/unloaded services
+        if self.filter_mode != FilterMode::User {
+            match dbus::list_unit_files(&self.system_bus, BusType::System).await {
+                Ok(file_units) => {
+                    for fu in file_units {
+                        if let Some(existing) = units.iter_mut().find(|u| u.name == fu.name) {
+                            existing.unit_file_state = fu.unit_file_state;
+                        } else {
+                            units.push(fu);
+                        }
+                    }
+                }
+                Err(e) => tracing::warn!("Failed to list system unit files: {e}"),
+            }
+        }
+
+        if self.filter_mode != FilterMode::System {
+            match dbus::list_unit_files(&self.session_bus, BusType::Session).await {
+                Ok(file_units) => {
+                    for fu in file_units {
+                        if let Some(existing) = units.iter_mut().find(|u| u.name == fu.name) {
+                            existing.unit_file_state = fu.unit_file_state;
+                        } else {
+                            units.push(fu);
+                        }
+                    }
+                }
+                Err(e) => tracing::warn!("Failed to list user unit files: {e}"),
+            }
+        }
+
         self.all_units = units;
         Ok(())
     }
@@ -348,6 +383,11 @@ impl App {
             StatusFilter::Failed => {
                 filtered.retain(|u| u.active_state == ActiveState::Failed);
             }
+        }
+
+        // Hide disabled services if toggled off
+        if !self.show_disabled {
+            filtered.retain(|u| u.unit_file_state != UnitFileState::Disabled);
         }
 
         // Apply include/exclude mode
@@ -668,6 +708,10 @@ impl App {
                 self.apply_filters();
                 self.save_state();
             }
+            KeyAction::ToggleDisabled => {
+                self.show_disabled = !self.show_disabled;
+                self.apply_filters();
+            }
             KeyAction::CycleLogLevel => {
                 // Extract needed values first to avoid borrow conflicts
                 let info = self.pane_tree.get_leaf_mut(self.focused_pane).map(|pane| {
@@ -840,10 +884,10 @@ impl App {
                     }
                     HitTarget::StatusBar => {
                         let sl = self.layout_cache.status_line_area;
-                        let zone_width = sl.width / 4;
+                        let zone_width = sl.width / 5;
                         if zone_width > 0 {
                             let relative_x = col.saturating_sub(sl.x);
-                            let zone = (relative_x / zone_width).min(3);
+                            let zone = (relative_x / zone_width).min(4);
                             match zone {
                                 0 => {
                                     self.filter_mode = self.filter_mode.cycle_next();
@@ -865,6 +909,10 @@ impl App {
                                     self.sort_mode = self.sort_mode.cycle_next();
                                     self.apply_filters();
                                     self.save_state();
+                                }
+                                4 => {
+                                    self.show_disabled = !self.show_disabled;
+                                    self.apply_filters();
                                 }
                                 _ => {}
                             }

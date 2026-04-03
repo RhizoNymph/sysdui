@@ -156,6 +156,11 @@ pub fn render(app: &App, sidebar_state: &mut ListState, frame: &mut Frame) -> La
         Span::styled(mode_label, Style::default().fg(Color::Cyan)),
         Span::styled("] [Sort: ", Style::default().fg(Color::DarkGray)),
         Span::styled(app.sort_mode.label(), Style::default().fg(Color::Cyan)),
+        Span::styled("] [Disabled: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            if app.show_disabled { "Show" } else { "Hide" },
+            Style::default().fg(Color::Cyan),
+        ),
         Span::styled("]", Style::default().fg(Color::DarkGray)),
     ];
     frame.render_widget(
