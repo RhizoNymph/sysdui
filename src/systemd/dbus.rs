@@ -145,10 +145,7 @@ pub async fn get_service_detail(conn: &Connection, object_path: &str) -> Result<
     let svc_iface = "org.freedesktop.systemd1.Service";
 
     if let Ok(reply) = unit_proxy.call_method("GetAll", &(unit_iface,)).await {
-        if let Ok(props) = reply
-            .body()
-            .deserialize::<HashMap<String, OwnedValue>>()
-        {
+        if let Ok(props) = reply.body().deserialize::<HashMap<String, OwnedValue>>() {
             if let Some(v) = props.get("ActiveState") {
                 detail.active_state = try_string(v);
             }
@@ -177,10 +174,7 @@ pub async fn get_service_detail(conn: &Connection, object_path: &str) -> Result<
     }
 
     if let Ok(reply) = unit_proxy.call_method("GetAll", &(svc_iface,)).await {
-        if let Ok(props) = reply
-            .body()
-            .deserialize::<HashMap<String, OwnedValue>>()
-        {
+        if let Ok(props) = reply.body().deserialize::<HashMap<String, OwnedValue>>() {
             if let Some(v) = props.get("MainPID") {
                 detail.main_pid = try_u32(v);
             }
@@ -198,9 +192,7 @@ pub async fn get_service_detail(conn: &Connection, object_path: &str) -> Result<
 
 fn try_string(v: &OwnedValue) -> String {
     // zbus 5: downcast_ref returns Result<T, Error> where T is owned
-    v.downcast_ref::<String>()
-        .ok()
-        .unwrap_or_default()
+    v.downcast_ref::<String>().ok().unwrap_or_default()
 }
 
 fn try_string_vec(v: &OwnedValue) -> Vec<String> {
@@ -261,11 +253,7 @@ pub fn spawn_signal_listener(
                     if let Some(path) = path {
                         let changed: HashMap<String, OwnedValue> = msg
                             .body()
-                            .deserialize::<(
-                                String,
-                                HashMap<String, OwnedValue>,
-                                Vec<String>,
-                            )>()
+                            .deserialize::<(String, HashMap<String, OwnedValue>, Vec<String>)>()
                             .map(|(_, props, _)| props)
                             .unwrap_or_default();
 
@@ -288,9 +276,7 @@ pub fn spawn_signal_listener(
             .unwrap()
             .build();
 
-        if let Ok(mut stream) =
-            zbus::MessageStream::for_match_rule(mgr_rule, &conn, None).await
-        {
+        if let Ok(mut stream) = zbus::MessageStream::for_match_rule(mgr_rule, &conn, None).await {
             while let Some(Ok(msg)) = stream.next().await {
                 let member = msg.header().member().map(|m| m.to_string());
                 match member.as_deref() {

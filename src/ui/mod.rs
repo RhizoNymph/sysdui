@@ -69,10 +69,7 @@ pub fn render(app: &App, sidebar_state: &mut ListState, frame: &mut Frame) -> La
     let sidebar_width = 35u16.min(content_area.width / 3);
     let columns = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(sidebar_width),
-            Constraint::Min(1),
-        ])
+        .constraints([Constraint::Length(sidebar_width), Constraint::Min(1)])
         .split(content_area);
 
     let sidebar_area = columns[0];
@@ -107,7 +104,7 @@ pub fn render(app: &App, sidebar_state: &mut ListState, frame: &mut Frame) -> La
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(9), // detail panel
-            Constraint::Min(1),   // log panel(s)
+            Constraint::Min(1),    // log panel(s)
         ])
         .split(panel_area);
 
@@ -116,8 +113,7 @@ pub fn render(app: &App, sidebar_state: &mut ListState, frame: &mut Frame) -> La
 
     // Render detail panel
     let selected_unit = app.selected_unit();
-    let selected_detail = selected_unit
-        .and_then(|u| app.unit_details.get(&u.name));
+    let selected_detail = selected_unit.and_then(|u| app.unit_details.get(&u.name));
     detail::render_detail(frame, detail_area, selected_unit, selected_detail);
 
     // Render pane layout for logs
@@ -140,10 +136,18 @@ pub fn render(app: &App, sidebar_state: &mut ListState, frame: &mut Frame) -> La
     // Status line
     let mode_label = match app.list_mode {
         crate::app::ListMode::Include => {
-            format!("{} ({})", app.list_mode.label(), app.config.filter.include.len())
+            format!(
+                "{} ({})",
+                app.list_mode.label(),
+                app.config.filter.include.len()
+            )
         }
         crate::app::ListMode::Exclude => {
-            format!("{} ({})", app.list_mode.label(), app.config.filter.exclude.len())
+            format!(
+                "{} ({})",
+                app.list_mode.label(),
+                app.config.filter.exclude.len()
+            )
         }
         crate::app::ListMode::All => app.list_mode.label().to_string(),
     };

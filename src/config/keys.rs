@@ -102,10 +102,7 @@ impl KeyBindings {
     }
 
     pub fn action_to_key(&self, action: &KeyAction) -> Option<KeyEvent> {
-        self.map
-            .iter()
-            .find(|(_, a)| *a == action)
-            .map(|(k, _)| *k)
+        self.map.iter().find(|(_, a)| *a == action).map(|(k, _)| *k)
     }
 
     #[allow(dead_code)]

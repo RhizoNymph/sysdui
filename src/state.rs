@@ -72,7 +72,10 @@ impl SerializedPaneNode {
                     _ => SplitDirection::Vertical,
                 },
                 ratio: 0.5,
-                children: [Box::new(left.to_pane_node()), Box::new(right.to_pane_node())],
+                children: [
+                    Box::new(left.to_pane_node()),
+                    Box::new(right.to_pane_node()),
+                ],
             }),
         }
     }

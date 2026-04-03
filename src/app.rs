@@ -11,8 +11,8 @@ use ratatui::layout::{Position, Rect};
 use tokio::sync::mpsc;
 use zbus::Connection;
 
-use crate::config::keys::KeyAction;
 use crate::config::Config;
+use crate::config::keys::KeyAction;
 use crate::event::AppEvent;
 use crate::journal;
 use crate::journal::filter::Priority;
@@ -232,35 +232,58 @@ impl App {
             }
         };
 
-        let (filter_mode, status_filter, list_mode, sort_mode, pane_tree, focused_pane, selected_service) =
-            if let Some(ref session) = session {
-                let fm = match session.filter_mode.as_str() {
-                    "user" => FilterMode::User,
-                    "system" => FilterMode::System,
-                    _ => FilterMode::Both,
-                };
-                let sf = match session.status_filter.as_str() {
-                    "active" => StatusFilter::Active,
-                    "inactive" => StatusFilter::Inactive,
-                    "failed" => StatusFilter::Failed,
-                    _ => StatusFilter::All,
-                };
-                let lm = match session.list_mode.as_str() {
-                    "include" => ListMode::Include,
-                    "exclude" => ListMode::Exclude,
-                    _ => ListMode::All,
-                };
-                let sm = match session.sort_mode.as_str() {
-                    "status" => SortMode::Status,
-                    "uptime" => SortMode::Uptime,
-                    _ => SortMode::Name,
-                };
-                let tree = session.to_pane_tree();
-                (fm, sf, lm, sm, tree, session.focused_pane, session.selected_service.clone())
-            } else {
-                let tree = PaneTree::new(String::new(), priority);
-                (config_filter_mode, config_status_filter, config_list_mode, config_sort_mode, tree, 1, None)
+        let (
+            filter_mode,
+            status_filter,
+            list_mode,
+            sort_mode,
+            pane_tree,
+            focused_pane,
+            selected_service,
+        ) = if let Some(ref session) = session {
+            let fm = match session.filter_mode.as_str() {
+                "user" => FilterMode::User,
+                "system" => FilterMode::System,
+                _ => FilterMode::Both,
             };
+            let sf = match session.status_filter.as_str() {
+                "active" => StatusFilter::Active,
+                "inactive" => StatusFilter::Inactive,
+                "failed" => StatusFilter::Failed,
+                _ => StatusFilter::All,
+            };
+            let lm = match session.list_mode.as_str() {
+                "include" => ListMode::Include,
+                "exclude" => ListMode::Exclude,
+                _ => ListMode::All,
+            };
+            let sm = match session.sort_mode.as_str() {
+                "status" => SortMode::Status,
+                "uptime" => SortMode::Uptime,
+                _ => SortMode::Name,
+            };
+            let tree = session.to_pane_tree();
+            (
+                fm,
+                sf,
+                lm,
+                sm,
+                tree,
+                session.focused_pane,
+                session.selected_service.clone(),
+            )
+        } else {
+            let tree = PaneTree::new(String::new(), priority);
+            (
+                config_filter_mode,
+                config_status_filter,
+                config_list_mode,
+                config_sort_mode,
+                tree,
+                1,
+                None,
+            )
+        };
 
         let mut app = Self {
             all_units: Vec::new(),
@@ -487,9 +510,7 @@ impl App {
             AppEvent::Terminal(Event::Resize(_, _)) => {} // re-render handles this
             AppEvent::Tick => self.handle_tick().await,
             AppEvent::Render => {} // handled in main loop
-            AppEvent::UnitNew {
-                name, bus_type, ..
-            } => {
+            AppEvent::UnitNew { name, bus_type, .. } => {
                 self.handle_unit_new(&name, bus_type).await;
             }
             AppEvent::UnitRemoved { name, .. } => {
@@ -518,7 +539,9 @@ impl App {
 
     async fn handle_key(&mut self, key: KeyEvent) {
         // Ctrl-C always quits, regardless of input mode
-        if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
+        if key
+            .modifiers
+            .contains(crossterm::event::KeyModifiers::CONTROL)
             && key.code == KeyCode::Char('c')
         {
             self.should_quit = true;
@@ -983,8 +1006,7 @@ impl App {
             }
             MouseEventKind::ScrollDown => {
                 if let Some(m) = &mut self.context_menu {
-                    m.selected_index =
-                        (m.selected_index + 1).min(m.items.len().saturating_sub(1));
+                    m.selected_index = (m.selected_index + 1).min(m.items.len().saturating_sub(1));
                 }
             }
             _ => {}
@@ -1074,8 +1096,7 @@ impl App {
                     self.request_action_for_unit(sa, unit_name);
                 }
             }
-            ContextMenuAction::SplitNewPaneHorizontal
-            | ContextMenuAction::SplitNewPaneVertical => {
+            ContextMenuAction::SplitNewPaneHorizontal | ContextMenuAction::SplitNewPaneVertical => {
                 if let ContextMenuTarget::SidebarService { unit_name } = menu.target {
                     let dir = if action == ContextMenuAction::SplitNewPaneHorizontal {
                         SplitDirection::Horizontal
@@ -1083,12 +1104,10 @@ impl App {
                         SplitDirection::Vertical
                     };
                     let priority = self.config.log.priority;
-                    if let Some(new_id) = self.pane_tree.split(
-                        self.focused_pane,
-                        dir,
-                        unit_name.clone(),
-                        priority,
-                    ) {
+                    if let Some(new_id) =
+                        self.pane_tree
+                            .split(self.focused_pane, dir, unit_name.clone(), priority)
+                    {
                         self.focused_pane = new_id;
                         let bus_type = self.get_bus_type_for_service(&unit_name);
                         self.start_journal_for_pane(new_id, &unit_name, bus_type, priority);
@@ -1243,7 +1262,14 @@ impl App {
             self.confirm_dialog = Some(ConfirmDialog::new_service(action, unit_name));
             self.input_mode = InputMode::Confirm;
         } else {
-            self.execute_action_with_name(action, if action.needs_unit() { Some(unit_name) } else { None });
+            self.execute_action_with_name(
+                action,
+                if action.needs_unit() {
+                    Some(unit_name)
+                } else {
+                    None
+                },
+            );
         }
     }
 
@@ -1304,12 +1330,10 @@ impl App {
     fn split_pane(&mut self, direction: SplitDirection) {
         let service_name = self.selected_unit_name().unwrap_or_default();
         let priority = self.config.log.priority;
-        if let Some(new_id) = self.pane_tree.split(
-            self.focused_pane,
-            direction,
-            service_name.clone(),
-            priority,
-        ) {
+        if let Some(new_id) =
+            self.pane_tree
+                .split(self.focused_pane, direction, service_name.clone(), priority)
+        {
             self.focused_pane = new_id;
             if !service_name.is_empty() {
                 let bus_type = self.get_bus_type_for_service(&service_name);

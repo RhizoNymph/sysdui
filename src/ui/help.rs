@@ -69,7 +69,12 @@ pub fn render_help_bar(frame: &mut Frame, area: Rect, bindings: &KeyBindings, is
     frame.render_widget(p, area);
 }
 
-fn push_hint(spans: &mut Vec<Span<'static>>, bindings: &KeyBindings, action: KeyAction, label: &str) {
+fn push_hint(
+    spans: &mut Vec<Span<'static>>,
+    bindings: &KeyBindings,
+    action: KeyAction,
+    label: &str,
+) {
     let key_str = bindings
         .action_to_key(&action)
         .map(format_key_event)
@@ -100,44 +105,55 @@ pub fn render_help_overlay(frame: &mut Frame, area: Rect, bindings: &KeyBindings
 
     // Group bindings by category for readability
     let categories: &[(&str, &[KeyAction])] = &[
-        ("Navigation", &[
-            KeyAction::NavigateUp,
-            KeyAction::NavigateDown,
-            KeyAction::Select,
-            KeyAction::PageUp,
-            KeyAction::PageDown,
-        ]),
-        ("Service Actions", &[
-            KeyAction::Start,
-            KeyAction::Restart,
-            KeyAction::Stop,
-            KeyAction::Enable,
-            KeyAction::Disable,
-            KeyAction::DaemonReload,
-            KeyAction::EditUnit,
-        ]),
-        ("Search & Filter", &[
-            KeyAction::SearchServices,
-            KeyAction::SearchLogs,
-            KeyAction::CycleFilter,
-            KeyAction::CycleStatusFilter,
-            KeyAction::ToggleDisabled,
-            KeyAction::ToggleListMode,
-            KeyAction::ToggleInclude,
-            KeyAction::ToggleExclude,
-            KeyAction::CycleSort,
-            KeyAction::CycleLogLevel,
-        ]),
-        ("Panes", &[
-            KeyAction::PinPane,
-            KeyAction::ClosePane,
-            KeyAction::CycleFocus,
-        ]),
-        ("General", &[
-            KeyAction::Quit,
-            KeyAction::ShowHelp,
-            KeyAction::Escape,
-        ]),
+        (
+            "Navigation",
+            &[
+                KeyAction::NavigateUp,
+                KeyAction::NavigateDown,
+                KeyAction::Select,
+                KeyAction::PageUp,
+                KeyAction::PageDown,
+            ],
+        ),
+        (
+            "Service Actions",
+            &[
+                KeyAction::Start,
+                KeyAction::Restart,
+                KeyAction::Stop,
+                KeyAction::Enable,
+                KeyAction::Disable,
+                KeyAction::DaemonReload,
+                KeyAction::EditUnit,
+            ],
+        ),
+        (
+            "Search & Filter",
+            &[
+                KeyAction::SearchServices,
+                KeyAction::SearchLogs,
+                KeyAction::CycleFilter,
+                KeyAction::CycleStatusFilter,
+                KeyAction::ToggleDisabled,
+                KeyAction::ToggleListMode,
+                KeyAction::ToggleInclude,
+                KeyAction::ToggleExclude,
+                KeyAction::CycleSort,
+                KeyAction::CycleLogLevel,
+            ],
+        ),
+        (
+            "Panes",
+            &[
+                KeyAction::PinPane,
+                KeyAction::ClosePane,
+                KeyAction::CycleFocus,
+            ],
+        ),
+        (
+            "General",
+            &[KeyAction::Quit, KeyAction::ShowHelp, KeyAction::Escape],
+        ),
     ];
 
     for (cat_name, actions) in categories {
@@ -162,6 +178,8 @@ pub fn render_help_overlay(frame: &mut Frame, area: Rect, bindings: &KeyBindings
         lines.push(Line::default());
     }
 
-    let p = Paragraph::new(lines).block(block).wrap(Wrap { trim: false });
+    let p = Paragraph::new(lines)
+        .block(block)
+        .wrap(Wrap { trim: false });
     frame.render_widget(p, overlay_area);
 }

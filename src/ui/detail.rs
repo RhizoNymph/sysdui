@@ -29,7 +29,9 @@ pub fn render_detail(
         Span::styled("Service: ", Style::default().fg(Color::DarkGray)),
         Span::styled(
             &unit.name,
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
         ),
     ]));
 
@@ -108,7 +110,9 @@ pub fn render_detail(
             lines.push(Line::default());
             lines.push(Line::from(Span::styled(
                 &detail.description,
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
             )));
         }
     } else {

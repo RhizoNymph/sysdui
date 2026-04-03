@@ -6,23 +6,14 @@ use ratatui::{
 use crate::journal::filter::find_matches;
 use crate::ui::panes::PaneLeaf;
 
-pub fn render_log_pane(
-    frame: &mut Frame,
-    area: Rect,
-    pane: &PaneLeaf,
-    focused: bool,
-) {
+pub fn render_log_pane(frame: &mut Frame, area: Rect, pane: &PaneLeaf, focused: bool) {
     let border_color = if focused {
         Color::Cyan
     } else {
         Color::DarkGray
     };
 
-    let title = format!(
-        " Logs: {} [{}] ",
-        pane.service_name,
-        pane.priority_filter
-    );
+    let title = format!(" Logs: {} [{}] ", pane.service_name, pane.priority_filter);
 
     let follow_indicator = if pane.is_following() {
         " [LIVE] "
@@ -88,7 +79,9 @@ pub fn render_log_pane(
         })
         .collect();
 
-    let p = Paragraph::new(lines).block(block).wrap(Wrap { trim: false });
+    let p = Paragraph::new(lines)
+        .block(block)
+        .wrap(Wrap { trim: false });
     frame.render_widget(p, area);
 
     // Scrollbar

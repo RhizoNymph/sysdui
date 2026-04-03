@@ -59,7 +59,11 @@ async fn main() -> Result<()> {
     events.spawn_render_timer();
 
     // Spawn D-Bus signal listeners
-    dbus::spawn_signal_listener(system_bus.clone(), systemd::types::BusType::System, tx.clone());
+    dbus::spawn_signal_listener(
+        system_bus.clone(),
+        systemd::types::BusType::System,
+        tx.clone(),
+    );
     dbus::spawn_signal_listener(
         session_bus.clone(),
         systemd::types::BusType::Session,

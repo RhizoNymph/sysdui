@@ -151,15 +151,11 @@ fn find_and_split(
     }
     match node {
         PaneNode::Leaf(leaf) if leaf.id == target_id => {
-            let old_node =
-                std::mem::replace(node, PaneNode::Leaf(dummy_leaf()));
+            let old_node = std::mem::replace(node, PaneNode::Leaf(dummy_leaf()));
             *node = PaneNode::Split(PaneSplit {
                 direction,
                 ratio: 0.5,
-                children: [
-                    Box::new(old_node),
-                    Box::new(PaneNode::Leaf(new_leaf)),
-                ],
+                children: [Box::new(old_node), Box::new(PaneNode::Leaf(new_leaf))],
             });
             true
         }
@@ -190,10 +186,8 @@ fn close_node(node: &mut PaneNode, target_id: PaneId) -> bool {
         return false;
     };
 
-    let left_is_target =
-        matches!(&*split.children[0], PaneNode::Leaf(l) if l.id == target_id);
-    let right_is_target =
-        matches!(&*split.children[1], PaneNode::Leaf(l) if l.id == target_id);
+    let left_is_target = matches!(&*split.children[0], PaneNode::Leaf(l) if l.id == target_id);
+    let right_is_target = matches!(&*split.children[1], PaneNode::Leaf(l) if l.id == target_id);
 
     if left_is_target {
         if let PaneNode::Leaf(leaf) = &*split.children[0] {
@@ -477,9 +471,19 @@ mod tests {
         // Test via the PaneTree::layout public API
         let mut tree = PaneTree::new("svc-a".to_string(), Priority::Info);
         // tree has Leaf(1), next_id=2
-        tree.split(1, SplitDirection::Horizontal, "svc-b".to_string(), Priority::Info);
+        tree.split(
+            1,
+            SplitDirection::Horizontal,
+            "svc-b".to_string(),
+            Priority::Info,
+        );
         // now: Split(H, Leaf(1), Leaf(2)), next_id=3
-        tree.split(2, SplitDirection::Horizontal, "svc-c".to_string(), Priority::Info);
+        tree.split(
+            2,
+            SplitDirection::Horizontal,
+            "svc-c".to_string(),
+            Priority::Info,
+        );
         // now: Split(H, Leaf(1), Split(H, Leaf(2), Leaf(3))), next_id=4
 
         let area = Rect::new(0, 0, 120, 40);

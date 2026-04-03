@@ -11,7 +11,12 @@ pub type Tui = Terminal<CrosstermBackend<io::Stdout>>;
 
 pub fn init() -> Result<Tui> {
     terminal::enable_raw_mode()?;
-    crossterm::execute!(stdout(), EnterAlternateScreen, EnableMouseCapture, cursor::Hide)?;
+    crossterm::execute!(
+        stdout(),
+        EnterAlternateScreen,
+        EnableMouseCapture,
+        cursor::Hide
+    )?;
     let backend = CrosstermBackend::new(stdout());
     let terminal = Terminal::new(backend)?;
     Ok(terminal)
