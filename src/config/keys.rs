@@ -26,6 +26,7 @@ pub enum KeyAction {
     CycleLogLevel,
     ToggleInclude,
     ToggleExclude,
+    ToggleDisabled,
     Quit,
     ShowHelp,
     Confirm,
@@ -65,6 +66,7 @@ impl KeyAction {
             Self::CycleLogLevel => "log level",
             Self::ToggleInclude => "+include",
             Self::ToggleExclude => "-exclude",
+            Self::ToggleDisabled => "disabled",
             Self::Quit => "quit",
             Self::ShowHelp => "help",
             Self::Confirm => "confirm",
@@ -141,6 +143,7 @@ impl Default for KeyBindings {
         map.insert(key('i'), KeyAction::ToggleListMode);
         map.insert(key('t'), KeyAction::CycleSort);
         map.insert(key('l'), KeyAction::CycleLogLevel);
+        map.insert(key('u'), KeyAction::ToggleDisabled);
         // Include/exclude list editing
         map.insert(key('+'), KeyAction::ToggleInclude);
         map.insert(key('-'), KeyAction::ToggleExclude);
@@ -282,6 +285,7 @@ pub fn apply_config_keys(
         ("toggle_list_mode", KeyAction::ToggleListMode),
         ("toggle_include", KeyAction::ToggleInclude),
         ("toggle_exclude", KeyAction::ToggleExclude),
+        ("toggle_disabled", KeyAction::ToggleDisabled),
         ("pin_pane", KeyAction::PinPane),
         ("close_pane", KeyAction::ClosePane),
         ("cycle_focus", KeyAction::CycleFocus),

@@ -65,7 +65,7 @@ Overview:
 
 Features Index:
     service_browsing:
-        description: Browse, filter, sort, and fuzzy-search systemd services across system and user scopes
+        description: Browse, filter, sort, and fuzzy-search systemd services across system and user scopes with toggleable disabled service visibility
         entry_points: [src/app.rs:apply_filters, src/ui/sidebar.rs:render_sidebar]
         depends_on: [dbus_communication, configuration]
         doc: docs/features/service_browsing.md
@@ -77,7 +77,7 @@ Features Index:
         doc: docs/features/service_control.md
 
     log_streaming:
-        description: Live-tail journalctl logs per service with priority filtering, text search, and scrollback
+        description: Live-tail journalctl logs per service with priority filtering, text search, word wrap, and scrollback
         entry_points: [src/journal/mod.rs:spawn_journal_stream, src/ui/logs.rs:render_log_pane]
         depends_on: [pane_management]
         doc: docs/features/log_streaming.md
@@ -95,8 +95,8 @@ Features Index:
         doc: docs/features/configuration.md
 
     dbus_communication:
-        description: D-Bus interface to systemd for listing units, subscribing to signals, and querying service details
-        entry_points: [src/systemd/dbus.rs:list_units, src/systemd/dbus.rs:spawn_signal_listener]
+        description: D-Bus interface to systemd for listing units, listing unit files, subscribing to signals, and querying service details
+        entry_points: [src/systemd/dbus.rs:list_units, src/systemd/dbus.rs:list_unit_files, src/systemd/dbus.rs:spawn_signal_listener]
         depends_on: []
         doc: docs/features/dbus_communication.md
 

@@ -1,6 +1,6 @@
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
 };
 
 use crate::journal::filter::find_matches;
@@ -88,7 +88,7 @@ pub fn render_log_pane(
         })
         .collect();
 
-    let p = Paragraph::new(lines).block(block);
+    let p = Paragraph::new(lines).block(block).wrap(Wrap { trim: false });
     frame.render_widget(p, area);
 
     // Scrollbar

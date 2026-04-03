@@ -32,6 +32,7 @@ pub struct FilterConfig {
     pub mode: String,
     pub show: String,
     pub status: String,
+    pub show_disabled: bool,
     pub include: Vec<String>,
     pub exclude: Vec<String>,
 }
@@ -62,6 +63,7 @@ impl Default for Config {
                 mode: "all".to_string(),
                 show: "both".to_string(),
                 status: "all".to_string(),
+                show_disabled: true,
                 include: vec![],
                 exclude: vec![],
             },
@@ -143,6 +145,9 @@ pub fn load_config() -> Result<Config> {
         }
         if let Some(v) = f.status {
             config.filter.status = v;
+        }
+        if let Some(v) = f.show_disabled {
+            config.filter.show_disabled = v;
         }
         if let Some(v) = f.include {
             config.filter.include = v;
@@ -249,6 +254,7 @@ struct RawFilter {
     mode: Option<String>,
     show: Option<String>,
     status: Option<String>,
+    show_disabled: Option<bool>,
     include: Option<Vec<String>>,
     exclude: Option<Vec<String>>,
 }
